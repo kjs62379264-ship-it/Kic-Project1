@@ -1,0 +1,170 @@
+/* static/base.css */
+
+/* --- 1. 기본 스타일 및 레이아웃 --- */
+html, body {
+    height: 100%;
+    margin: 0;
+}
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background-color: #f0f2f5; 
+}
+.header {
+    color: white; 
+    padding: 10px;
+    text-align: center;
+}
+.main-container {
+    display: flex;
+    padding: 20px;
+    min-height: calc(100vh - 61px); 
+    box-sizing: border-box; 
+}
+
+/* --- 2. 사이드바 및 메뉴 스타일 --- */
+.sidebar {
+    background-color: #e0e0e0; 
+    width: 200px; 
+    padding: 20px;
+    border-radius: 15px; 
+    margin-right: 20px; 
+}
+.sidebar ul {
+    list-style-type: none; 
+    padding: 0; 
+    margin: 0; 
+    padding-top: 20px; /* 메뉴 상단에 여백 추가 */
+    border-top: 1px solid #ccc; /* 프로필과 메뉴 구분선 */
+}
+.sidebar a {
+    display: block; 
+    padding: 30px; 
+    text-decoration: none; 
+    color: #2c3e50;
+    border-radius: 5px;
+    transition: background-color 0.3s; 
+    font-size: 2em; 
+}
+.sidebar a:hover {
+    background-color: #d1d1d1; 
+}
+
+/* --- 3. 프로필 영역 스타일 --- */
+.profile-area {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    margin-bottom: 20px;
+}
+.profile-photo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-right: 15px;
+    overflow: hidden;
+    border: 2px solid #ddd;
+    background-image: url("profile_photos/4.jpg"); 
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.user-info {
+    line-height: 1.2;
+}
+.user-name {
+    font-weight: bold;
+    font-size: 1.1em;
+    margin: 0;
+}
+.user-dept {
+    font-size: 0.9em;
+    color: #555;
+    margin: 0;
+}
+
+/* --- 4. 메인 컨텐츠 그리드 및 카드 공통 스타일 --- */
+.content-grid {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 20px;
+    grid-template-rows: 1fr auto; 
+}
+.card {
+    background-color: #ffffff;
+    border: 1px solid #000000; 
+    min-height: 150px;
+    padding: 15px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column; 
+    padding: 0; 
+}
+.card-header {
+    background-color: #f0f2f5; 
+    padding: 10px 15px; 
+    border-bottom: 3px solid #000000; 
+    font-weight: bold; 
+}
+.card-body {
+    padding: 15px; 
+    flex-grow: 1; 
+}
+/* 대시보드 그리드 위치 (대시보드 페이지에만 적용됨) */
+.card.box1 { grid-column: 1 / 2; grid-row: 1; }
+.card.box3 { grid-column: 1 / 2; grid-row: 2; }
+.card.box4 { grid-column: 1 / 2; grid-row: 3; }
+.card.box2 { grid-column: 2 / 3; grid-row: 1 / span 2; }
+.card.box5 { grid-column: 2 / 3; grid-row: 3; }
+
+/* static/base.css */
+
+/* --- 1. 서브 메뉴 기본 설정 --- */
+.sidebar .has-submenu {
+    position: relative; /* 서브 메뉴의 기준 위치 설정 */
+}
+
+.sidebar .submenu {
+    display: none; /* 기본적으로 서브 메뉴 숨기기 */
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    
+    /* 🌟🌟 플라이아웃 위치 지정 🌟🌟 */
+    position: absolute; 
+    top: 0; 
+    left: 100%; /* 메인 메뉴(li)의 오른쪽 끝에 배치 */
+    
+    width: 150px; /* 서브 메뉴의 너비 설정 */
+    background-color: #f8f8f8; /* 서브 메뉴 배경색 */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+    z-index: 50; /* 다른 요소 위에 나타나도록 설정 */
+    
+    /* 애니메이션 추가 (부드럽게 나타나도록) */
+    opacity: 0; 
+    transition: opacity 0.3s, visibility 0.3s;
+    visibility: hidden;
+}
+
+/* --- 2. 서브 메뉴 항목 스타일 --- */
+.sidebar .submenu li a {
+    padding: 10px 15px; /* 서브 메뉴 링크는 메인 메뉴보다 작게 */
+    font-size: 0.9em;
+    color: #333;
+    background-color: transparent; /* 배경색 초기화 */
+}
+
+.sidebar .submenu li a:hover {
+    background-color: #ddd;
+}
+
+/* --- 3. 마우스 오버 시 서브 메뉴 표시 --- */
+
+.sidebar .has-submenu:hover > .submenu {
+    display: block; /* 서브 메뉴 보이게 함 */
+    opacity: 1; /* 투명도 100% */
+    visibility: visible;
+}

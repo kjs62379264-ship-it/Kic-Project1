@@ -1,0 +1,68 @@
+/* static/hr_styles.css */
+
+/* --- 직원 명부 헤더 및 버튼 스타일 --- */
+.employee-list-header {
+    display: flex;
+    justify-content: space-between; 
+    align-items: center; 
+}
+.header-btn {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    margin-left: 10px; 
+}
+
+/* --- 버튼 공통 및 개별 스타일 --- */
+.action-buttons {
+    display: flex;
+    flex-direction: column; 
+    gap: 10px; 
+}
+.main-action-btn, .sub-action-btn, .detail-btn {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+.main-action-btn { 
+    background-color: #2ecc71; 
+    color: white;
+}
+.main-action-btn:hover {
+    background-color: #27ae60;
+}
+.sub-action-btn { 
+    background-color: #3498db; 
+    color: white;
+}
+.sub-action-btn:hover {
+    background-color: #2980b9;
+}
+.detail-btn { 
+    background-color: #e0e0e0;
+    color: #333;
+    padding: 5px 10px;
+}
+.detail-btn:hover {
+    background-color: #ccc;
+}
+
+/* --- 직원 테이블 스타일 --- */
+.employee-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    font-size: 0.95em;
+}
+.employee-table th, .employee-table td {
+    border: 1px solid #e0e0e0;
+    padding: 10px 15px;
+    text-align: left;
+}
+.employee-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    color: #333;
+}
