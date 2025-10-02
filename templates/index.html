@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>인사관리 시스템</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
@@ -16,6 +16,7 @@
                     <li><a href="#인사-관리">인사 관리</a></li>
                     <li><a href="#근태-관리">근태 관리</a></li>
                     <li><a href="#급여-관리">급여 관리</a></li>
+                    <li><a href="{{ url_for('logout') }}">로그아웃</a></li>
                 </ul>
             </nav>
         </aside>
