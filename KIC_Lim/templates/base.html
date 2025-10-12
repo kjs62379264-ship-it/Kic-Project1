@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}인사관리 시스템{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}"> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='hr_styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+</head>
+<body>
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="profile-area">
+                <div class="profile-photo"></div>
+                <div class="user-info">
+                    <p class="user-name">홍길동 (관리자)</p>
+                    <p class="user-dept">인사팀</p>
+                </div>
+            </div>
+            <nav>
+        <ul>
+            <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
+
+            <li class="has-submenu">
+                <a href="{{ url_for('hr_management') }}">인사 관리</a>
+            </li>
+            
+            <li><a href="#">급여 관리</a></li>
+            <li><a href="#">근태 관리</a></li>
+        </ul>
+    </nav>
+</aside>
+        
+        <main class="content-grid">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+</body>
+</html>
