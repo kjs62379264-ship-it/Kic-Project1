@@ -10,84 +10,49 @@ USERS = {
     "user1": "password"
 }
 
-# --------------------------------------------------
-# 공통 함수: 로그인 여부 확인
-# --------------------------------------------------
-def check_login():
-    """로그인되지 않았을 경우 로그인 페이지로 리디렉션하는 헬퍼 함수."""
-    if 'logged_in' not in session or not session['logged_in']:
-        return redirect(url_for('login'))
-    return None # 로그인 상태일 경우 None 반환
-
-# --------------------------------------------------
-# 인증 (로그인/로그아웃) 및 메인 페이지 라우트
-# --------------------------------------------------
-
+# --- 1. 로그인 페이지 렌더링 및 처리 ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # POST 요청 (로그인 시도)
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
+        # 사용자 인증 확인
         if username in USERS and USERS[username] == password:
+            # 로그인 성공 시 세션에 사용자 정보 저장
             session['logged_in'] = True
             session['username'] = username
+            
+            # 메인 페이지로 리디렉션
             return redirect(url_for('index'))
         else:
+            # 로그인 실패 시 에러 메시지와 함께 로그인 페이지 다시 표시
             error = '아이디 또는 비밀번호가 올바르지 않습니다.'
             return render_template('login.html', error=error)
     
+    # GET 요청 (로그인 페이지 접속)
     return render_template('login.html')
 
-@app.route('/logout')
-def logout():
-    session.pop('logged_in', None)
-    session.pop('username', None)
-    return redirect(url_for('login'))
-
+# --- 2. 메인 페이지 렌더링 및 접근 제어 ---
 @app.route('/')
 def index():
-    if check_login():
-        return check_login()
+    # 세션에 'logged_in' 정보가 없으면 (로그인되지 않았으면)
+    if 'logged_in' not in session or not session['logged_in']:
+        # 로그인 페이지로 강제 리디렉션
+        return redirect(url_for('login'))
+    
+    # 로그인된 경우에만 메인 페이지 (index.html)를 렌더링
     return render_template('index.html')
 
-
-# --------------------------------------------------
-# 인사 관리 중분류 페이지 라우트
-# --------------------------------------------------
-
-# 1. 사원 정보 관리 페이지
-@app.route('/employee_info')
-def employee_info():
-    if check_login():
-        return check_login()
-    # templates/hr/employee_info.html 렌더링
-    return render_template('hr/employee_info.html') 
-
-# 2. 조직 및 부서 관리 페이지
-@app.route('/organization')
-def organization():
-    if check_login():
-        return check_login()
-    # templates/hr/organization.html 렌더링
-    return render_template('hr/organization.html') 
-
-# 3. 평가 및 교육 관리 페이지
-@app.route('/performance_education')
-def performance_education():
-    if check_login():
-        return check_login()
-    # templates/hr/performance_education.html 렌더링
-    return render_template('hr/performance_education.html') 
-
-# 4. 발령 및 경력 관리 페이지
-@app.route('/assignment_career')
-def assignment_career():
-    if check_login():
-        return check_login()
-    # templates/hr/assignment_career.html 렌더링
-    return render_template('hr/assignment_career.html') 
-
+# --- 3. 로그아웃 처리 ---
+@app.route('/logout')
+def logout():
+    # 세션에서 사용자 정보 삭제
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    # 로그인 페이지로 리디렉션
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
     # 디버그 모드는 개발 중에만 사용하고, 실제 배포 시에는 False로 설정하세요.
