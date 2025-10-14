@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}인사 관리{% endblock %}
+
+{% block content %}
+    <div class="personnel-container">
+        <h2>직원 목록 및 관리</h2>
+        
+        <!-- 검색, 필터, 등록 버튼 영역 -->
+        <div class="action-bar">
+            <input type="text" placeholder="이름 또는 사번 검색" class="search-input">
+            <button class="btn-search">검색</button>
+            <!-- 등록 버튼 클릭 시 모달이 열리도록 변경 -->
+            <button class="btn-add-new" id="open-modal-btn" style="background-color: #3498db; color: white;">+ 새 직원 등록</button>
+        </div>
+
+        <!-- 직원 목록 테이블 영역 -->
+        <div class="table-wrapper">
+            <table class="employee-list">
+                <thead>
+                    <tr>
+                        <th>사번</th>
+                        <th>이름</th>
+                        <th>부서</th>
+                        <th>직급</th>
+                        <th>입사일</th>
+                        <th>상태</th>
+                        <th>관리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 데이터가 없을 경우를 대비한 예시 행 -->
+                    {% if employees %}
+                        <!-- DB에서 전달받은 직원 목록 데이터를 Jinja2로 반복하여 테이블에 채웁니다. -->
+                        {% for employee in employees %}
+                        <tr>
+                            <td>{{ employee.id }}</td>
+                            <td>{{ employee.name }}</td>
+                            <td>{{ employee.department }}</td>
+                            <td>{{ employee.position }}</td>
+                            <td>{{ employee.hire_date }}</td>
+                            <td>{{ employee.status }}</td>
+                            <td><button class="btn-detail">상세보기</button></td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 20px;">등록된 직원 정보가 없습니다.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- ========================================================== -->
+    <!-- 새 직원 등록 모달 (Modal) 추가 -->
+    <!-- ========================================================== -->
+    <div id="add-employee-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>새 직원 정보 등록</h3>
+            <!-- /add_employee 라우트로 POST 요청을 보냅니다. -->
+            <form method="POST" action="{{ url_for('add_employee') }}">
+                
+                <div class="form-group">
+                    <label for="employee_id">사번 (필수)</label>
+                    <input type="text" id="employee_id" name="employee_id" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="name">이름 (필수)</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="department">부서</label>
+                    <input type="text" id="department" name="department">
+                </div>
+
+                <div class="form-group">
+                    <label for="position">직급</label>
+                    <input type="text" id="position" name="position">
+                </div>
+                
+                <div class="form-group">
+                    <label for="hire_date">입사일 (YYYY-MM-DD)</label>
+                    <input type="text" id="hire_date" name="hire_date" placeholder="예: 2024-01-01">
+                </div>
+
+                <button type="submit" class="btn-submit">등록하기</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 모달 작동을 위한 JavaScript -->
+    <script>
+        const modal = document.getElementById("add-employee-modal");
+        const openBtn = document.getElementById("open-modal-btn");
+        const closeBtn = document.querySelector(".close-btn");
+
+        // 버튼 클릭 시 모달 열기
+        openBtn.onclick = function() {
+            modal.style.display = "block";
+        }
+
+        // 닫기 버튼 (X) 클릭 시 모달 닫기
+        closeBtn.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        // 모달 바깥 클릭 시 닫기
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+{% endblock %}
