@@ -169,7 +169,7 @@ def dashboard():
 
 # 인사 관리 관련 모든 라우트에 admin_required 적용
 @app.route('/hr')
-@admin_required # ✨ [수정] 관리자 전용
+@login_required # ✨ [수정] admin_required에서 login_required로 변경
 def hr_management():
     # ... (기존 로직) ...
     id_query = request.args.get('id', '')
@@ -274,7 +274,7 @@ def add_employee():
     return render_template('add_employee.html', departments=departments, positions=positions, email_domains=email_domains)
 
 @app.route('/hr/employee/<employee_id>')
-@admin_required # ✨ [수정] 관리자 전용
+@login_required # ✨ [수정] admin_required에서 login_required로 변경
 def employee_detail(employee_id):
     # ... (기존 로직) ...
     conn = sqlite3.connect('employees.db')

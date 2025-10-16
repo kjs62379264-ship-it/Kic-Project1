@@ -45,7 +45,7 @@
                 <ul>
                     <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
         
-                    {# ✨ [핵심 수정] 관리자(admin)인 경우에만 메뉴 표시 #}
+                    {# 관리자(admin)인 경우에만 인사 관리 메뉴 표시 #}
                     {% if g.user.role == 'admin' %}
                     <li class="has-submenu">
                         <a href="{{ url_for('hr_management') }}">인사 관리</a>

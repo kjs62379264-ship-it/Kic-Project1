@@ -10,7 +10,10 @@
         <div>직원 명부 (총 {{ employee_count }}명)</div>
         <div class="header-actions">
             <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="sub-action-btn header-btn">🖨️ 명부 인쇄/다운로드</a>
+            {# ✨ [수정] 관리자일 때만 '신규 직원 등록' 버튼 표시 #}
+            {% if g.user.role == 'admin' %}
             <a href="{{ url_for('add_employee') }}" class="main-action-btn header-btn">➕ 신규 직원 등록</a>
+            {% endif %}
         </div>
     </div>
 
