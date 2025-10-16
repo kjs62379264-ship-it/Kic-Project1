@@ -7,47 +7,60 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}"> 
     <link rel="stylesheet" href="{{ url_for('static', filename='hr_styles.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    {# ✨ [추가] 커스텀 스타일 블록: 로그인 페이지에서 스타일 재정의용 #}
+    {% block custom_styles %}{% endblock %} 
     
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <div class="main-container">
+        
+        {# ✨ [핵심 수정] g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
+        {% if g.user %}
         <aside class="sidebar">
             <div class="profile-area">
                 <div class="profile-photo"></div>
                 <div class="user-info">
-                    <p class="user-name">홍길동 (관리자)</p>
-                    <p class="user-dept">인사팀</p>
+                    {# ✨ [수정] g.user 변수를 사용하여 현재 로그인 사용자 정보 표시 #}
+                    <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
+                    <p class="user-dept">{{ g.user['department'] }}</p> 
                 </div>
-                <!-- ✨ [수정] 출퇴근 버튼 영역 ('완료' 상태 제거) -->
                 <div class="attendance-section">
                     {% if attendance_button_state == '퇴근' %}
                         <form action="{{ url_for('clock') }}" method="POST">
                             <button type="submit" class="btn attendance-btn check-out">퇴근</button>
                         </form>
                     {% else %}
-                        <!-- 그 외 모든 경우는 '출근' 버튼을 보여줍니다. -->
                         <form action="{{ url_for('clock') }}" method="POST">
                             <button type="submit" class="btn attendance-btn check-in">출근</button>
                         </form>
                     {% endif %}
+                </div>
+                
+                {# ✨ [추가] 로그아웃 버튼 #}
+                <div style="margin-top: 15px;">
+                    <a href="{{ url_for('logout') }}" class="btn danger-action-btn" style="width: 100%;">로그아웃</a>
                 </div>
             </div>
             <nav>
                 <ul>
                     <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
         
+                    {# ✨ [핵심 수정] 관리자(admin)인 경우에만 메뉴 표시 #}
+                    {% if g.user.role == 'admin' %}
                     <li class="has-submenu">
                         <a href="{{ url_for('hr_management') }}">인사 관리</a>
                         <ul class="submenu">
                             <li><a href="{{ url_for('settings_management') }}">설정 관리</a></li>
                         </ul>
                     </li>
+                    {% endif %}
                     
                     <li><a href="#">급여 관리</a></li>
                     <li><a href="#">근태 관리</a></li>
                 </ul>
             </nav>
         </aside>
+        {% endif %} {# ✨ [수정] 로그인 상태 체크 종료 #}
         
         <main class="content-grid">
             {% block content %}
@@ -56,4 +69,3 @@
     </div>
 </body>
 </html>
-
