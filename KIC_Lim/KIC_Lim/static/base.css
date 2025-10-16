@@ -1,0 +1,197 @@
+/* static/base.css */
+
+/* --- 1. 기본 스타일 및 레이아웃 --- */
+html, body {
+    height: 100%;
+    margin: 0;
+}
+body {
+    margin: 0;
+    font-family: sans-serif;
+    background-color: #f0f2f5; 
+}
+.main-container {
+    display: flex;
+    padding: 20px;
+    min-height: calc(100vh - 40px); 
+    box-sizing: border-box; 
+}
+
+/* --- 2. 사이드바 및 메뉴 스타일 --- */
+.sidebar {
+    background-color: #ffffff; 
+    width: 240px; 
+    padding: 20px;
+    border-radius: 15px; 
+    margin-right: 20px; 
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+.sidebar ul {
+    list-style-type: none; 
+    padding: 0; 
+    margin: 0; 
+}
+.sidebar nav {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+}
+.sidebar a {
+    display: block; 
+    padding: 15px 20px; 
+    text-decoration: none; 
+    color: #2c3e50;
+    border-radius: 8px;
+    transition: background-color 0.2s, color 0.2s; 
+    font-size: 1.1em;
+    font-weight: 500;
+    margin: 5px 0;
+}
+.sidebar a:hover,
+.sidebar .has-submenu:hover > a { /* 하위 메뉴가 열릴 때도 상위 메뉴 하이라이트 유지 */
+    background-color: #f0f2f5;
+    color: #3498db; 
+}
+
+/* --- 3. 프로필 영역 스타일 --- */
+.profile-area {
+    padding: 10px 0;
+    margin-bottom: 20px;
+    text-align: center;
+}
+.profile-photo {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    margin: 0 auto 15px auto;
+    overflow: hidden;
+    border: 3px solid #eee;
+    background-image: url("https://placehold.co/100x100/EFEFEF/AAAAAA&text=User"); 
+    background-size: cover;
+    background-position: center;
+}
+.user-info {
+    line-height: 1.4;
+    margin-bottom: 20px;
+}
+.user-name {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin: 0;
+}
+.user-dept {
+    font-size: 0.95em;
+    color: #555;
+    margin: 0;
+}
+
+.attendance-section {
+    margin-top: 15px;
+}
+.attendance-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.1em;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.attendance-btn.check-in {
+    background-color: #2ecc71;
+}
+.attendance-btn.check-in:hover {
+    background-color: #27ae60;
+}
+.attendance-btn.check-out {
+    background-color: #e74c3c;
+}
+.attendance-btn.check-out:hover {
+    background-color: #c0392b;
+}
+.view-records-link {
+    display: block; 
+    text-align: center; 
+    margin-top: 10px; 
+    font-size: 0.9em; 
+    color: #555;
+}
+
+/* --- 4. 메인 컨텐츠 그리드 및 카드 공통 스타일 --- */
+.content-grid {
+    flex-grow: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-content: start;
+}
+.card {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column; 
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+.card-header {
+    background-color: #f9f9f9; 
+    padding: 12px 20px; 
+    border-bottom: 1px solid #e0e0e0; 
+    font-weight: 600;
+    font-size: 1.1em;
+}
+.card-body {
+    padding: 20px; 
+    flex-grow: 1; 
+}
+
+.dashboard .content-grid {
+    grid-template-columns: 1fr 2fr;
+    grid-template-rows: repeat(3, 1fr);
+}
+.dashboard .box1 { grid-column: 1 / 2; grid-row: 1; }
+.dashboard .box3 { grid-column: 1 / 2; grid-row: 2; }
+.dashboard .box4 { grid-column: 1 / 2; grid-row: 3; }
+.dashboard .box2 { grid-column: 2 / 3; grid-row: 1 / span 2; }
+.dashboard .box5 { grid-column: 2 / 3; grid-row: 3; }
+
+
+/* ✨ [핵심 추가] 정보 제공용 하위 메뉴 스타일 */
+.sidebar .has-submenu {
+    position: relative; /* 하위 메뉴의 기준점 */
+}
+
+.sidebar .submenu-info {
+    list-style-type: none;
+    padding: 10px 15px;
+    margin: 0 5px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    
+    /* 부드러운 효과를 위한 설정 */
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out, margin 0.3s ease-out;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: -5px; /* 메뉴 간격을 자연스럽게 */
+}
+
+.sidebar .has-submenu:hover > .submenu-info {
+    /* 마우스를 올리면 최대 높이를 늘려 펼쳐지게 함 */
+    max-height: 200px; /* 내용이 충분히 들어갈 높이 */
+    padding-top: 10px;
+    padding-bottom: 10px;
+    margin-top: 0;
+}
+
+.sidebar .submenu-info li {
+    padding: 4px 0;
+    font-size: 0.9em;
+    color: #555;
+}
+
