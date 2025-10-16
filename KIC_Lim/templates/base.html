@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko" class="{% block html_class %}{% endblock %}">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}인사관리 시스템{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}"> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='hr_styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="main-container">
+        <aside class="sidebar">
+            <div class="profile-area">
+                <div class="profile-photo"></div>
+                <div class="user-info">
+                    <p class="user-name">홍길동 (관리자)</p>
+                    <p class="user-dept">인사팀</p>
+                </div>
+                <!-- ✨ [수정] 출퇴근 버튼 영역 ('완료' 상태 제거) -->
+                <div class="attendance-section">
+                    {% if attendance_button_state == '퇴근' %}
+                        <form action="{{ url_for('clock') }}" method="POST">
+                            <button type="submit" class="btn attendance-btn check-out">퇴근</button>
+                        </form>
+                    {% else %}
+                        <!-- 그 외 모든 경우는 '출근' 버튼을 보여줍니다. -->
+                        <form action="{{ url_for('clock') }}" method="POST">
+                            <button type="submit" class="btn attendance-btn check-in">출근</button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
+        
+                    <li class="has-submenu">
+                        <a href="{{ url_for('hr_management') }}">인사 관리</a>
+                        <ul class="submenu">
+                            <li><a href="{{ url_for('settings_management') }}">설정 관리</a></li>
+                        </ul>
+                    </li>
+                    
+                    <li><a href="#">급여 관리</a></li>
+                    <li><a href="#">근태 관리</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="content-grid">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+</body>
+</html>
+
