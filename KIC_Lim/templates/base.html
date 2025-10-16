@@ -56,7 +56,9 @@
                         </ul>
                     </li>
                     
-                    <li><a href="#">급여 관리</a></li>
+                    {# ✨ [수정] 급여 관리 링크를 올바른 라우트로 연결합니다. #}
+                    <li><a href="{{ url_for('salary_management') }}">급여 관리</a></li>
+                    
                     <li><a href="#">근태 관리</a></li>
                 </ul>
             </nav>

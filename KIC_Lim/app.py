@@ -501,5 +501,11 @@ def edit_department():
         conn.close()
     return redirect(url_for('settings_management'))
 
+@app.route('/salary')
+@login_required # 모든 로그인 사용자 접근 가능
+def salary_management():
+    # 현재는 데이터를 처리할 필요 없이 템플릿만 렌더링합니다.
+    return render_template('salary_management.html')
+
 if __name__ == '__main__':
     app.run(debug=True)
