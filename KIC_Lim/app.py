@@ -328,7 +328,7 @@ def edit_employee(employee_id):
                            email_parts=email_parts)
 
 @app.route('/hr/print')
-@admin_required # ✨ [수정] 관리자 전용
+@login_required # 👈 @admin_required를 이것으로 변경
 def print_employees():
     # ... (기존 로직) ...
     id_query = request.args.get('id', '')
