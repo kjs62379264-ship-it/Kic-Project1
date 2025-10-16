@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko" class="{% block html_class %}{% endblock %}">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}인사관리 시스템{% endblock %}</title>
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}"> 
+    <link rel="stylesheet" href="{{ url_for('static', filename='hr_styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <div class="main-container">
+        <aside class="sidebar">
+<div class="profile-area">
+    <div class="profile-photo"></div>
+    <div class="user-info">
+        <p class="user-name">홍길동 (관리자)</p>
+        <p class="user-dept">인사팀</p>
+    </div>
+    <div class="attendance-section">
+        {% if attendance_button_state == '퇴근' %}
+            <form action="{{ url_for('clock') }}" method="POST">
+                <button type="submit" class="btn attendance-btn check-out">퇴근</button>
+            </form>
+        {% else %}
+            <form action="{{ url_for('clock') }}" method="POST">
+                <button type="submit" class="btn attendance-btn check-in">출근</button>
+            </form>
+        {% endif %}
+    </div>
+    <!-- ✨ [추가] '내 기록 보기' 링크를 복원합니다. -->
+    <a href="{{ url_for('my_attendance') }}" class="view-records-link">내 기록 보기</a>
+</div>
+
+            <nav>
+                <ul>
+                    <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
+        
+                    <!-- ✨ [핵심 수정] 마우스 오버 시 정보 목록을 보여줄 하위 <ul> 추가 -->
+                    <li class="has-submenu">
+                        <a href="{{ url_for('hr_management') }}">인사 관리</a>
+                        <!-- 이 부분은 링크가 아닌 정보 제공용 목록입니다. -->
+                        <ul class="submenu-info">
+                            <li>- 직원 검색/정렬</li>
+                            <li>- 신규 직원 등록</li>
+                            <li>- 명부 인쇄</li>
+                            <li>- 설정 관리</li>
+                        </ul>
+                    </li>
+                    
+                    <li><a href="#">급여 관리</a></li>
+                    <li><a href="#">근태 관리</a></li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <main class="content-grid">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+</body>
+</html>
+
