@@ -1,74 +1,144 @@
-<!DOCTYPE html>
-<html lang="ko" class="{% block html_class %}{% endblock %}">
-<head>
-    <meta charset="UTF-8">
-    <title>{% block title %}인사관리 시스템{% endblock %}</title>
+{% extends "base_layout.html" %}
+{# ✨ [수정] base.html은 이제 base_layout.html을 상속받습니다. #}
+{# (base_layout.html은 아래 5단계에서 새로 만듭니다) #}
+
+{% block title %}{% block page_title %}대시보드{% endblock %} - 인사관리 시스템{% endblock %}
+
+{% block body_class %}{% block page_body_class %}{% endblock %}{% endblock %}
+
+{% block content %}
+<div class="main-container">
     
-    <link rel="stylesheet" href="{{ url_for('static', filename='base.css') }}"> 
-    <link rel="stylesheet" href="{{ url_for('static', filename='hr_styles.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    {# ✨ [추가] 커스텀 스타일 블록: 로그인 페이지에서 스타일 재정의용 #}
-    {% block custom_styles %}{% endblock %} 
-    
-</head>
-<body class="{% block body_class %}{% endblock %}">
-    <div class="main-container">
+    {# g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
+    {% if g.user %}
+<aside class="sidebar">
         
-        {# ✨ [핵심 수정] g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
-        {% if g.user %}
-        <aside class="sidebar">
-            <div class="profile-area">
-                <div class="profile-photo"></div>
-                <div class="user-info">
-                    {# ✨ [수정] g.user 변수를 사용하여 현재 로그인 사용자 정보 표시 #}
-                    <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
-                    <p class="user-dept">{{ g.user['department'] }}</p> 
-                </div>
-                <div class="attendance-section">
-                    {% if attendance_button_state == '퇴근' %}
-                        <form action="{{ url_for('clock') }}" method="POST">
-                            <button type="submit" class="btn attendance-btn check-out">퇴근</button>
-                        </form>
-                    {% else %}
-                        <form action="{{ url_for('clock') }}" method="POST">
-                            <button type="submit" class="btn attendance-btn check-in">출근</button>
-                        </form>
-                    {% endif %}
-                </div>
-                
-                {# ✨ [추가] 로그아웃 버튼 #}
-                <div style="margin-top: 15px;">
-                    <a href="{{ url_for('logout') }}" class="btn danger-action-btn" style="width: 100%;">로그아웃</a>
-                </div>
+        <div class="profile-area">
+            <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user.profile_image or 'default.jpg')) }}');"></div>
+            <div class="user-info">
+                <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
+                <p class="user-dept">{{ g.user['department'] }}</p> 
             </div>
-            <nav>
-                <ul>
-                    <li><a href="{{ url_for('dashboard') }}">메인 화면</a></li>
+            
+            <div class="attendance-section">
+                {% if attendance_button_state == '퇴근' %}
+                    <form action="{{ url_for('clock') }}" method="POST">
+                        <button type="submit" class="btn attendance-btn check-out">퇴근</button>
+                    </form>
+                {% else %}
+                    <form action="{{ url_for('clock') }}" method="POST">
+                        <button type="submit" class="btn attendance-btn check-in">출근</button>
+                    </form>
+                {% endif %}
+                
+                </div> </div> <nav>
+            <ul>
+                <li class="has-submenu">
+                    <a href="{{ url_for('hr_management') }}">인사 관리</a>
+
+                    {% if g.user.role == 'admin' %}
+                    <ul class="submenu-info">
+                        <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
+                        <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
+                        <li><a href="{{ url_for('add_notice_page') }}">- 공지사항 작성</a></li>
+                        <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
+                    </ul>
+                    {% endif %}
+                </li>
+                <li><a href="{{ url_for('attendance') }}">근태 관리</a></li> 
+                <li><a href="#">급여 관리</a></li> 
+                
+                <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
+                <li><a href="{{ url_for('change_password') }}">비밀번호 변경</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link" style="color: #e74c3c;">로그아웃</a></li>
+            </ul>
+        </nav>
+    </aside>
+    {% endif %} {# (g.user 로그인 체크 끝) #}
+    
+<main class="content-grid">
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    
+    {% if messages %}
+        <div style="grid-column: 1 / -1;">
+            {% for category, message in messages %}
+                <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# ✨ [핵심 수정] "content" 블록의 이름을 "page_content"로 변경합니다 #}
+    {% block page_content %}
+    {% endblock %}
+    
+    {% endwith %}
+</main>
+</div>
+
+<script>
+    // 이 함수는 폼이 제출될 때 호출됩니다.
+    function handleSubmit(form) {
+        const button = form.querySelector('.attendance-btn'); // 클래스로 버튼 찾기
+        if (button.disabled) {
+            return false; // 이미 비활성화 상태면 제출을 막습니다.
+        }
+        // 브라우저 저장소에 현재 클릭 시간을 기록합니다.
+        localStorage.setItem('lastClockTime', Date.now());
+        // (선택 사항) 제출 직후 버튼을 비활성화할 수도 있습니다.
+        // button.disabled = true;
+        // button.style.cursor = 'wait';
+        // button.innerText = '처리중...';
+        return true; // 폼 제출을 허용합니다.
+    }
+
+    // 이 함수는 페이지가 로드될 때마다 실행됩니다.
+    window.addEventListener('load', () => {
+        // 모든 출퇴근 버튼 폼을 찾습니다 (출근/퇴근 폼이 둘 다 있을 수 있으므로)
+        const forms = document.querySelectorAll('.attendance-section form');
         
-                    {# ✨ [핵심 수정] 인사 관리 메뉴 전체를 조건문 밖으로 이동 #}
-                    <li class="has-submenu">
-                        <a href="{{ url_for('hr_management') }}">인사 관리</a>
-                        <ul class="submenu">
-                            {# '설정 관리' 메뉴만 관리자(admin)인 경우에 표시 #}
-                            {% if g.user.role == 'admin' %} 
-                            <li><a href="{{ url_for('settings_management') }}">설정 관리</a></li>
-                            {% endif %}
-                        </ul>
-                    </li>
-                    
-                    {# ✨ [수정] 급여 관리 링크를 올바른 라우트로 연결합니다. #}
-                    <li><a href="{{ url_for('salary_management') }}">급여 관리</a></li>
-                    
-                    <li><a href="#">근태 관리</a></li>
-                </ul>
-            </nav>
-        </aside>
-        {% endif %} {# ✨ [수정] 로그인 상태 체크 종료 #}
-        
-        <main class="content-grid">
-            {% block content %}
-            {% endblock %}
-        </main>
-    </div>
-</body>
-</html>
+        forms.forEach(form => {
+            const button = form.querySelector('.attendance-btn');
+            if (!button) return;
+
+            // 폼에 이벤트 리스너 추가 (기존 onsubmit 제거)
+            form.onsubmit = function() { return handleSubmit(this); };
+
+            const lastClockTime = localStorage.getItem('lastClockTime');
+            const cooldownPeriod = 5000; // 5초 (5000ms)
+
+            if (lastClockTime) {
+                const timePassed = Date.now() - parseInt(lastClockTime);
+
+                if (timePassed < cooldownPeriod) {
+                    const remainingTime = cooldownPeriod - timePassed;
+                    let countdown = Math.ceil(remainingTime / 1000);
+
+                    button.disabled = true;
+                    button.style.cursor = 'wait';
+                    button.innerText = `대기... (${countdown}초)`;
+
+                    const interval = setInterval(() => {
+                        countdown--;
+                        if (countdown > 0) {
+                            button.innerText = `대기... (${countdown}초)`;
+                        }
+                    }, 1000);
+
+                    // 남은 시간만큼만 기다렸다가 버튼을 다시 활성화합니다.
+                    setTimeout(() => {
+                        clearInterval(interval);
+                        button.disabled = false;
+                        button.style.cursor = 'pointer';
+                        // 버튼 텍스트는 서버에서 새로 렌더링된 값이므로 그대로 둡니다.
+                        button.innerText = button.classList.contains('check-in') ? '출근' : '퇴근';
+                    }, remainingTime);
+                }
+            }
+        });
+    });
+</script>
+
+{% endblock %}

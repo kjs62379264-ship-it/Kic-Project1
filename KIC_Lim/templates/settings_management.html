@@ -2,23 +2,13 @@
 
 {% block title %}설정 관리{% endblock %}
 
-{% block content %}
-<!-- 성공 또는 경고 메시지를 표시하는 영역 -->
-<div style="grid-column: 1 / -1;">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            {% for category, message in messages %}
-                <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endif %}
-    {% endwith %}
-</div>
+{# ✨ [핵심 수정] "content"를 "page_content"로 변경 #}
+{% block page_content %}
 
-<!-- 부서 관리 카드 -->
 <div class="card">
-    <div class="card-header">부서 관리</div>
+    <div class="card-header">
+        <span>부서 관리</span>
+    </div>
     <div class="card-body">
         <h4>새 부서 추가</h4>
         <form method="POST" action="{{ url_for('add_department') }}">
@@ -34,19 +24,21 @@
             {% for dept in departments %}
             <li>
                 <span>{{ dept['name'] }} ({{ dept['code'] }})</span>
+                
+                {% if g.user.role == 'admin' %}
                 <div class="button-group">
                     <button class="btn sub-action-btn edit-btn" onclick="openEditModal('{{ dept['name'] }}', '{{ dept['code'] }}')">수정</button>
                     <form method="POST" action="{{ url_for('delete_department', dept_name=dept['name']) }}" onsubmit="return confirm('정말로 \'{{ dept['name'] }}\' 부서를 삭제하시겠습니까?');">
                         <button type="submit" class="danger-action-btn">삭제</button>
                     </form>
                 </div>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
     </div>
 </div>
 
-<!-- 부서 정보 수정 모달 (팝업창) -->
 <div id="editModal" class="modal">
     <div class="modal-content">
         <span class="close" onclick="closeEditModal()">&times;</span>
@@ -59,6 +51,7 @@
             </div>
             <div class="form-group">
                 <label for="new_dept_code_modal">새 부서 코드 (2자리)</label>
+                {# ✨ [버그 수정] name="new_department_code" -> "new_dept_code" #}
                 <input type="text" id="new_dept_code_modal" name="new_dept_code" required maxlength="2">
             </div>
             <button type="submit" class="btn main-action-btn">수정 완료</button>
@@ -66,9 +59,11 @@
     </div>
 </div>
 
-<!-- 직급 관리 카드 -->
 <div class="card">
-    <div class="card-header">직급 관리</div>
+    <div class="card-header">
+        <span>직급 관리</span>
+        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">목록으로</a>
+    </div>
     <div class="card-body">
         <h4>새 직급 추가</h4>
         <form method="POST" action="{{ url_for('add_position') }}" style="display: flex; gap: 10px;">
@@ -81,11 +76,14 @@
             {% for pos in positions %}
             <li>
                 <span>{{ pos['name'] }}</span>
+                
+                {% if g.user.role == 'admin' %}
                 <div class="button-group">
                     <form method="POST" action="{{ url_for('delete_position', pos_name=pos['name']) }}" onsubmit="return confirm('정말로 \'{{ pos['name'] }}\' 직급을 삭제하시겠습니까?');">
                         <button type="submit" class="danger-action-btn">삭제</button>
                     </form>
                 </div>
+                {% endif %}
             </li>
             {% endfor %}
         </ul>
@@ -98,7 +96,6 @@
     
     function openEditModal(name, code) {
         document.getElementById('original_dept_name').value = name;
-        // ✨ [수정] 올바른 ID를 사용하도록 수정했습니다.
         document.getElementById('new_dept_name_modal').value = name;
         document.getElementById('new_dept_code_modal').value = code;
         modal.style.display = "block";
@@ -115,76 +112,4 @@
     }
 </script>
 
-<style>
-/* 모달 및 알림창 관련 스타일 */
-.modal {
-    display: none; 
-    position: fixed; 
-    z-index: 100; 
-    left: 0;
-    top: 0;
-    width: 100%; 
-    height: 100%; 
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.4); 
-}
-.modal-content {
-    background-color: #fefefe;
-    margin: 15% auto; 
-    padding: 20px;
-    border: 1px solid #888;
-    width: 80%;
-    max-width: 500px;
-    border-radius: 8px;
-}
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 28px;
-    font-weight: bold;
-}
-.close:hover,
-.close:focus {
-    color: black;
-    text-decoration: none;
-    cursor: pointer;
-}
-.settings-list {
-    list-style-type: none; 
-    padding: 0;
-}
-.settings-list li {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid #eee;
-}
-.settings-list .button-group {
-    display: flex;
-    gap: 5px;
-}
-.settings-list .btn, .settings-list button {
-    padding: 2px 8px;
-    font-size: 0.8em;
-}
-.alert {
-    padding: 15px;
-    margin-bottom: 20px;
-    border-radius: 5px;
-    border: 1px solid transparent;
-}
-.alert-danger {
-    background-color: #f8d7da;
-    color: #721c24;
-    border-color: #f5c6cb;
-}
-.alert-success {
-    background-color: #d4edda;
-    color: #155724;
-    border-color: #c3e6cb;
-}
-</style>
-
 {% endblock %}
-
