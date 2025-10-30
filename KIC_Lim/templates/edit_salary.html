@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block page_title %}직원 급여 정보 등록/수정{% endblock %}
+
+{% block page_content %}
+<div class="card" style="grid-column: 1 / 3;">
+    
+    <div class="card-header">
+        <span>{{ employee.name }} ({{ employee.id }}) 님 급여 정보 {{ '수정' if salary_info else '등록' }}</span>
+        <a href="{{ url_for('salary_management') }}" class="sub-action-btn header-btn">🔙 목록으로</a>
+    </div>
+
+    <div class="card-body">
+        
+        <form method="POST" action="{{ url_for('add_salary_info', employee_id=employee.id) }}">
+            
+            <input type="hidden" name="employee_id" value="{{ employee.id }}">
+
+            <div class="form-group">
+                <label for="base_salary">연봉/기본급 (원)</label>
+                <input type="number" id="base_salary" name="base_salary" required 
+                       value="{{ salary_info.base_salary if salary_info else '' }}" 
+                       min="0" placeholder="숫자만 입력하세요">
+            </div>
+
+            <div class="form-group">
+                <label for="allowance">고정 수당 (원)</label>
+                <input type="number" id="allowance" name="allowance" 
+                       value="{{ salary_info.allowance if salary_info else '0' }}" 
+                       min="0" placeholder="식대, 차량 유지비 등">
+            </div>
+
+            <div class="form-group">
+                <label for="tax_rate">기본 소득세율 (%)</label>
+                <input type="number" id="tax_rate" name="tax_rate" required 
+                       value="{{ (salary_info.tax_rate * 100) if salary_info and salary_info.tax_rate else '5.0' }}" 
+                       min="0" max="100" step="0.1" placeholder="예: 5.0">
+            </div>
+
+            <div class="form-group">
+                <label for="contract_type">계약 형태</label>
+                <select id="contract_type" name="contract_type" required>
+                    {% set current_type = salary_info.contract_type if salary_info else '' %}
+                    <option value="정규직" {% if current_type == '정규직' %}selected{% endif %}>정규직</option>
+                    <option value="계약직" {% if current_type == '계약직' %}selected{% endif %}>계약직</option>
+                    <option value="파트타임" {% if current_type == '파트타임' %}selected{% endif %}>파트타임</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="payment_cycle">지급 주기</label>
+                <select id="payment_cycle" name="payment_cycle" required>
+                    {% set current_cycle = salary_info.payment_cycle if salary_info else '' %}
+                    <option value="월급" {% if current_cycle == '월급' %}selected{% endif %}>월급</option>
+                    <option value="연봉" {% if current_cycle == '연봉' %}selected{% endif %}>연봉</option>
+                    <option value="주급" {% if current_cycle == '주급' %}selected{% endif %}>주급</option>
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn main-action-btn">{{ '수정 완료' if salary_info else '등록하기' }}</button>
+                <a href="{{ url_for('salary_management') }}" class="btn sub-action-btn">취소</a>
+            </div>
+            
+        </form>
+    </div>
+</div>
+{% endblock %}

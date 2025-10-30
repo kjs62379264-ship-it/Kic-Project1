@@ -13,6 +13,8 @@ cursor.execute("DROP TABLE IF EXISTS email_domains")
 cursor.execute("DROP TABLE IF EXISTS attendance")
 cursor.execute("DROP TABLE IF EXISTS notices")
 cursor.execute("DROP TABLE IF EXISTS users")
+cursor.execute("DROP TABLE IF EXISTS salaries")          # 급여 기준 테이블
+cursor.execute("DROP TABLE IF EXISTS payroll_records")  # 급여 기록 테이블
 
 print("기존 테이블 모두 삭제 완료.")
 
@@ -57,54 +59,45 @@ CREATE TABLE notices (
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );""")
+# ✨ 급여 기준 정보 테이블
+cursor.execute("""
+CREATE TABLE salaries (
+    employee_id TEXT PRIMARY KEY,
+    base_salary INTEGER NOT NULL,
+    contract_type TEXT NOT NULL,
+    payment_cycle TEXT NOT NULL,
+    allowance INTEGER DEFAULT 0,
+    tax_rate REAL DEFAULT 0.05,
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+""")
+# ✨ 월별 급여 지급 기록 테이블
+cursor.execute("""
+CREATE TABLE payroll_records (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    pay_date TEXT NOT NULL, -- YYYY-MM 형식으로 저장
+    gross_pay INTEGER NOT NULL,
+    deductions INTEGER NOT NULL,
+    net_pay INTEGER NOT NULL,
+    bonus INTEGER DEFAULT 0,
+    memo TEXT,
+    UNIQUE (employee_id, pay_date),
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
+);
+""")
 print("모든 테이블 생성 완료.")
 
 # --- 4. 초기 데이터 삽입 ---
 
 # (1) 직원 정보 (employees)
 employees_data = [
-    # 기존 5명
     ('25HR0001', '홍길동', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'profile_1.jpg'),
     ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'profile_2.jpg'),
     ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'profile_3.jpg'),
     ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'profile_4.jpg'),
     ('admin', '시스템 관리자', '시스템', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'default.jpg'),
 ]
-
-'''
-# ✨ 더미 직원 20명 정보 추가
-dummy_departments = [d[0] for d in departments_list if d[0] != '시스템']
-dummy_positions = [p[0] for p in positions_list if p[0] not in ('관리자', '팀장')] # 팀장 제외
-dummy_genders = ['남성', '여성']
-'''
-
-# 부서별 카운터 초기화 (기존 ID 다음 번호부터 시작하도록)
-dept_counters = {'HR': 1, 'DV': 1, 'DS': 1, 'MK': 1, 'SL': 0, 'FN': 0}
-
-'''
-for i in range(1, 21):
-    emp_number = i + 4 # 기존 직원 4명 다음부터 번호 매기기
-    dept = dummy_departments[(i-1) % len(dummy_departments)] # 부서를 순환하며 배정
-    pos = dummy_positions[(i-1) % len(dummy_positions)]     # 직급을 순환하며 배정
-    gender = dummy_genders[(i-1) % len(dummy_genders)]       # 성별을 순환하며 배정
-
-    # 사번 생성 (예: 25SL0001, 25FN0001, 25HR0002 ...)
-    dept_code = next(code for name, code in departments_list if name == dept)
-    dept_counters[dept_code] += 1
-    emp_id = f"25{dept_code}{dept_counters[dept_code]:04d}"
-
-    name = f"테스트{emp_number}"
-    hire_y = 2024 + (i % 2) # 입사년도 2024 또는 2025
-    hire_m = (i % 12) + 1   # 입사월 1~12
-    hire_d = (i % 28) + 1   # 입사일 1~28
-    hire_date = f"{hire_y}-{hire_m:02d}-{hire_d:02d}"
-    phone = f"010-{1000+i:04d}-{1000+i:04d}"
-    email = f"test{emp_number}@company.com"
-    address = f"테스트 주소 {emp_number}"
-    profile_img = f"dummy_{i}.jpg" # 프로필 이미지 파일명 (실제 파일은 없음)
-
-    employees_data.append((emp_id, name, dept, pos, hire_date, phone, email, address, gender, '재직', profile_img))
-'''
 
 cursor.executemany("""
     INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
@@ -113,29 +106,36 @@ cursor.executemany("""
 
 # (2) 로그인 정보 (users)
 users_data = [
-    # 기존 5명
-    ('25HR0001', '25HR0001', generate_password_hash('1234'), 'admin'),
+    ('25HR0001', '25HR0001', generate_password_hash('1234'), 'admin'), # 관리자
     ('25DV0001', '25DV0001', generate_password_hash('1234'), 'user'),
     ('25DS0001', '25DS0001', generate_password_hash('1234'), 'user'),
     ('25MK0001', '25MK0001', generate_password_hash('1234'), 'user'),
-    ('admin', 'admin', generate_password_hash('0000'), 'admin'),
+    ('admin', 'admin', generate_password_hash('0000'), 'admin'), # 시스템 관리자
 ]
-
-# ✨ 추가된 20명에 대한 user 데이터 생성 (모두 role='user', pw='1234')
-default_password_hash = generate_password_hash('1234')
-for emp_data in employees_data[5:]: # 기존 5명 제외
-    emp_id = emp_data[0]
-    # 'admin' 계정은 이미 users_data에 있으므로 건너뜀
-    if emp_id != 'admin':
-        users_data.append((emp_id, emp_id, default_password_hash, 'user'))
-
 cursor.executemany("""
     INSERT INTO users (employee_id, username, password_hash, role)
     VALUES (?, ?, ?, ?)
 """, users_data)
 
-# (3) 샘플 공지사항
+# (3) 샘플 기본 급여 정보 (salaries)
+salaries_data = [
+    ('25HR0001', 50000000, '정규직', '월급', 200000, 0.08), 
+    ('25DV0001', 45000000, '정규직', '월급', 200000, 0.07), 
+    ('25DS0001', 35000000, '정규직', '월급', 150000, 0.05), 
+    ('25MK0001', 30000000, '계약직', '월급', 150000, 0.05),
+]
+cursor.executemany("""
+    INSERT INTO salaries (employee_id, base_salary, contract_type, payment_cycle, allowance, tax_rate)
+    VALUES (?, ?, ?, ?, ?, ?)
+""", salaries_data)
+
+# (4) 샘플 공지사항
 cursor.execute("INSERT INTO notices (title, content) VALUES (?, ?)", ('환영합니다!', '인사관리 시스템이 오픈되었습니다.'))
+
+# (5) 샘플 근태 기록 (급여 테스트를 위해 추가)
+today = datetime.now().strftime('%Y-%m-%d')
+cursor.execute("INSERT INTO attendance (employee_id, record_date, clock_in_time, attendance_status) VALUES (?, ?, ?, ?)", 
+               ('25HR0001', today, datetime.now().strftime('%Y-%m-%d 08:50:00'), '정상'))
 
 print("초기 데이터 삽입 완료.")
 
