@@ -7,7 +7,7 @@
     <div class="card-header employee-list-header">
         <div>직원 상세 정보</div>
         <div>
-            {% if g.user.role == 'admin' %} {# ✨ [수정] 관리자일 때만 버튼 그룹 표시 #}
+            <!-- ✨ [핵심 수정] '재직' 상태일 때만 수정과 퇴사 처리 버튼이 모두 보이도록 그룹으로 묶습니다. -->
             {% if employee['status'] == '재직' %}
                 <a href="{{ url_for('edit_employee', employee_id=employee['id']) }}" class="main-action-btn header-btn">✏️ 수정</a>
                 <form action="{{ url_for('process_departure', employee_id=employee['id']) }}" method="POST" style="display: inline;">
@@ -17,7 +17,6 @@
                     </button>
                 </form>
             {% endif %}
-            {% endif %} {# ✨ [수정] 관리자 체크 끝 #}
 
             <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">🔙 목록으로 돌아가기</a>
         </div>
