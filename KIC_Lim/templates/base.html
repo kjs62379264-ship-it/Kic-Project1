@@ -1,6 +1,5 @@
 {% extends "base_layout.html" %}
-{# ✨ [수정] base.html은 이제 base_layout.html을 상속받습니다. #}
-{# (base_layout.html은 아래 5단계에서 새로 만듭니다) #}
+{# base.html은 이제 base_layout.html을 상속받습니다. #}
 
 {% block title %}{% block page_title %}대시보드{% endblock %} - 인사관리 시스템{% endblock %}
 
@@ -11,10 +10,11 @@
     
     {# g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
     {% if g.user %}
-<aside class="sidebar">
+    <aside class="sidebar">
         
         <div class="profile-area">
-            <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user.profile_image or 'default.jpg')) }}');"></div>
+            {# ✨ [핵심 수정] g.user.profile_image -> g.user['profile_image'] 로 변경 #}
+            <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user['profile_image'] or 'default.jpg')) }}');"></div>
             <div class="user-info">
                 <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
                 <p class="user-dept">{{ g.user['department'] }}</p> 
@@ -31,7 +31,10 @@
                     </form>
                 {% endif %}
                 
-                </div> </div> <nav>
+            </div>
+        </div>
+        
+        <nav>
             <ul>
                 <li class="has-submenu">
                     <a href="{{ url_for('hr_management') }}">인사 관리</a>
@@ -46,7 +49,9 @@
                     {% endif %}
                 </li>
                 <li><a href="{{ url_for('attendance') }}">근태 관리</a></li> 
-                <li><a href="#">급여 관리</a></li> 
+                
+                {# 급여 관리 링크 #}
+                <li><a href="{{ url_for('salary_management') }}">급여 관리</a></li> 
                 
                 <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
                 <li><a href="{{ url_for('change_password') }}">비밀번호 변경</a></li>
@@ -70,7 +75,7 @@
         </div>
     {% endif %}
 
-    {# ✨ [핵심 수정] "content" 블록의 이름을 "page_content"로 변경합니다 #}
+    {# "content" 블록의 이름을 "page_content"로 사용합니다 #}
     {% block page_content %}
     {% endblock %}
     
@@ -142,3 +147,4 @@
 </script>
 
 {% endblock %}
+
