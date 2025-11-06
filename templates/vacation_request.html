@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}연차/휴가 신청{% endblock %}
+{% block page_body_class %}vacation-request-page{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header">
+        휴가 신청서 작성
+    </div>
+    <div class="card-body">
+        
+        <form method="POST" action="{{ url_for('vacation_request') }}">
+            
+            <div class="form-group">
+                <label for="leave_type">신청 유형</label>
+                <select id="leave_type" name="leave_type" required>
+                    <option value="">-- 유형 선택 --</option>
+                    <option value="연차">연차</option>
+                    <option value="오전 반차">오전 반차</option>
+                    <option value="오후 반차">오후 반차</option>
+                    <option value="병가">병가</option>
+                    <option value="경조사 휴가">경조사 휴가</option>
+                    <option value="기타">기타</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="start_date">시작일</label>
+                <input type="date" id="start_date" name="start_date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="end_date">종료일</label>
+                <input type="date" id="end_date" name="end_date" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="reason">사유 (선택 사항)</label>
+                <textarea id="reason" name="reason" rows="5" placeholder="병가, 경조사 휴가 등의 경우 사유를 간략히 기재하세요."></textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn main-action-btn">신청하기</button>
+                <a href="{{ url_for('my_attendance') }}" class="btn sub-action-btn">취소</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
