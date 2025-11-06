@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{# 브라우저 탭 제목은 상위 base.html의 page_title 블록을 비워서 '인사관리 시스템'만 남깁니다. #}
+{% block title %}{% endblock %} 
+{% block page_body_class %}my-attendance-page{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3; grid-row: 1 / 2;">
+    <div class="card-header">
+        <span>기간별 상세 근태 기록 조회</span>
+    </div>
+    
+    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
+    <form method="GET" action="{{ url_for('my_attendance') }}">
+        <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+            
+            <span style="font-weight: bold;">기간:</span>
+            <input type="date" name="start_date" style="width: 130px; padding: 8px;" 
+                   value="{{ start_date_filter|default('') }}">
+            ~
+            <input type="date" name="end_date" style="width: 130px; padding: 8px;"
+                   value="{{ end_date_filter|default('') }}">
+
+            <span style="font-weight: bold; margin-left: 15px;">상태:</span>
+            <select name="status_filter" style="padding: 8px;">
+                <option value="" {% if status_filter_value|default('') == '' %}selected{% endif %}>-- 전체 --</option>
+                <option value="정상" {% if status_filter_value == '정상' %}selected{% endif %}>정상 출근</option>
+                <option value="지각" {% if status_filter_value == '지각' %}selected{% endif %}>지각</option>
+                <option value="휴가" {% if status_filter_value == '휴가' %}selected{% endif %}>휴가</option>
+                <option value="결근" {% if status_filter_value == '결근' %}selected{% endif %}>결근</option>
+            </select>
+            
+            <div style="margin-left: auto; display: flex; gap: 10px;">
+                
+                <button type="submit" class="sub-action-btn header-btn" style="background-color: #3498db;">검색</button>
+                
+                <a href="{{ url_for('my_attendance') }}" class="sub-action-btn header-btn" 
+                   style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
+            </div>
+        </div>
+    </form>
+</div>
+    <div class="card-body" style="padding: 10px 20px; overflow-y: auto; max-height: 320px; min-height: 320px;"> 
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th style="width: 15%;">날짜</th>
+                    <th>출근 시간</th>
+                    <th>퇴근 시간</th>
+                    <th>총 근무 시간</th>
+                    <th style="width: 10%;">상태</th>
+                    <th>비고</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for record in attendance_records %}
+                <tr class="{% if record.status == '지각' %}resigned{% endif %}" style="{% if record.status == '지각' %}color: #e74c3c;{% endif %}">
+                    <td>{{ record.date }}</td>
+                    <td>{{ record.clock_in|default('-', true) }}</td>
+                    <td>{{ record.clock_out|default('-', true) }}</td>
+                    <td>{{ record.duration|default('-', true) }}</td>
+                    <td>
+                        <strong style="color: {% if record.status == '지각' %}#e74c3c{% elif record.status == '정상' %}#2ecc71{% else %}#7f8c8d{% endif %};">
+                            {{ record.status }}
+                        </strong>
+                    </td>
+                    <td>{{ record.note|default('-', true) }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; color: #7f8c8d;">검색된 근태 기록이 없습니다.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+<div class="card" style="grid-column: 1 / 2; grid-row: 2 / 3; height: 380px;">
+    <div class="card-header">
+        나의 복무 및 통계 요약
+    </div>
+    
+    <div class="card-body" style="padding: 30px; text-align: center;">
+        
+        <h2 style="color: #3498db; margin-top: 0; margin-bottom: 30px; font-size: 2.2em;"> 
+            잔여 연차: <strong>{{ monthly_stats.remaining_leave|default('N/A') }}일</strong>
+        </h2>
+        
+        <div style="display: flex; justify-content: space-around; margin-top: 40px; text-align: center;">
+            
+            <div style="width: 45%;">
+                <p style="font-size: 1.1em; color: #555; margin: 0 0 5px 0;">이번 달 지각 횟수</p> 
+                <h3 style="font-size: 2em; color: #e67e22; margin: 0;">{{ monthly_stats.late_count|default(0) }}회</h3>
+            </div>
+            
+            <div style="width: 45%;">
+                <p style="font-size: 1.1em; color: #555; margin: 0 0 5px 0;">이번 달 초과 근무</p> 
+                <h3 style="font-size: 2em; color: #2ecc71; margin: 0;">{{ monthly_stats.overtime_hours|default('0h') }}</h3>
+            </div>
+            
+        </div>
+
+        <a href="#" class="sub-action-btn" style="margin-top: 40px; padding: 10px 20px;">
+            급여 명세서 조회 📄 (향후)
+        </a>
+    </div>
+</div>
+
+
+<div class="card" style="grid-column: 2 / 3; grid-row: 2 / 3; height: 380px;">
+    <div class="card-header">
+        <span style="flex-grow: 1;">🗓️ {{ current_month_name }} 근태 달력</span>
+        
+        <button class="sub-action-btn calendar-nav-btn" 
+                onclick="changeMonth({{ current_year }}, {{ current_month | int - 1 }})">
+            &lt;
+        </button>
+        <button class="sub-action-btn calendar-nav-btn" 
+                onclick="changeMonth({{ current_year }}, {{ current_month | int + 1 }})">
+            &gt;
+        </button>
+    </div>
+    
+    <div class="card-body" style="padding: 10px;">
+        <div id="attendance-calendar" style="width: 100%;">
+            {{ calendar_html | safe }} 
+        </div>
+    </div>
+</div>
+
+{% endblock %}
