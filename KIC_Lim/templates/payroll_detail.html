@@ -36,7 +36,7 @@
             </tr>
         </table>
         
-        {# --------------------- 상세 지급 내역 (임시) --------------------- #}
+        {# --------------------- 상세 지급 내역 --------------------- #}
         <h4 style="margin-bottom: 15px;">지급/공제 상세 내역</h4>
         <div style="display: flex; gap: 40px;">
             
@@ -45,7 +45,7 @@
                 <h5 style="border-bottom: 2px solid #2ecc71; padding-bottom: 5px; color: #2ecc71;">지급 내역</h5>
                 <table class="employee-table" style="width: 100%;">
                     <tr><th>구분</th><th style="text-align: right;">금액 (원)</th></tr>
-                    <tr><td>기본급</td><td style="text-align: right;">{{ "{:,}".format(record.gross_pay - record.allowance - record.bonus) }}</td></tr>
+                    <tr><td>기본급 (근태반영)</td><td style="text-align: right;">{{ "{:,}".format(record.gross_pay - record.allowance - record.bonus) }}</td></tr>
                     <tr><td>고정 수당</td><td style="text-align: right;">{{ "{:,}".format(record.allowance) }}</td></tr>
                     <tr><td>보너스/성과급</td><td style="text-align: right;">{{ "{:,}".format(record.bonus) }}</td></tr>
                     <tr style="background-color: #f5f5f5; font-weight: bold;">
@@ -77,10 +77,13 @@
             {{ record.memo if record.memo else '특이 사항 없음.' }}
         </div>
         
+        {# ✨ [핵심 수정] 관리자용 삭제 버튼을 form으로 변경 #}
         {% if g.user.role == 'admin' %}
         <div style="margin-top: 20px; text-align: right;">
-            {# TODO: 명세서 수정/삭제 버튼 #}
-            <button class="danger-action-btn header-btn" onclick="alert('TODO: 명세서 삭제 기능을 구현해야 합니다.')">삭제</button>
+            <form method="POST" action="{{ url_for('delete_payroll_record', record_id=record.id) }}" 
+                  onsubmit="return confirm('정말로 이 급여 기록을 삭제하시겠습니까? (복구 불가)');">
+                <button type="submit" class="danger-action-btn header-btn">기록 삭제</button>
+            </form>
         </div>
         {% endif %}
         

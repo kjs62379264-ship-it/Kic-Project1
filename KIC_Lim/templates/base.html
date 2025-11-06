@@ -1,5 +1,5 @@
 {% extends "base_layout.html" %}
-{# base.html은 이제 base_layout.html을 상속받습니다. #}
+{# 이 파일은 사이드바, 플래시 메시지, 메인 콘텐츠 레이아웃을 담당합니다. #}
 
 {% block title %}{% block page_title %}대시보드{% endblock %} - 인사관리 시스템{% endblock %}
 
@@ -10,31 +10,36 @@
     
     {# g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
     {% if g.user %}
-    <aside class="sidebar">
+<aside class="sidebar">
         
         <div class="profile-area">
-            {# ✨ [핵심 수정] g.user.profile_image -> g.user['profile_image'] 로 변경 #}
-            <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user['profile_image'] or 'default.jpg')) }}');"></div>
+            <div class="profile-photo" 
+                 {# ✨ g.user를 딕셔너리로 접근하도록 수정 #}
+                 style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user['profile_image'] or 'default.jpg')) }}');"></div>
             <div class="user-info">
+                {# ✨ g.user를 딕셔너리로 접근하도록 수정 #}
                 <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
                 <p class="user-dept">{{ g.user['department'] }}</p> 
             </div>
             
             <div class="attendance-section">
+                {# attendance_button_state에 따른 버튼 상태 결정 #}
                 {% if attendance_button_state == '퇴근' %}
                     <form action="{{ url_for('clock') }}" method="POST">
                         <button type="submit" class="btn attendance-btn check-out">퇴근</button>
                     </form>
-                {% else %}
+                {% elif attendance_button_state == '출근' %}
                     <form action="{{ url_for('clock') }}" method="POST">
                         <button type="submit" class="btn attendance-btn check-in">출근</button>
                     </form>
+                {% elif attendance_button_state == '완료' %}
+                    <button class="btn attendance-btn" style="background-color: #7f8c8d; cursor: default;" disabled>출퇴근 완료</button>
+                {% else %}
+                    {# '연차', '외근' 등 휴가/부재 상태일 때 #}
+                    <button class="btn attendance-btn" style="background-color: #3498db; cursor: default;" disabled>{{ attendance_button_state }}</button>
                 {% endif %}
                 
-            </div>
-        </div>
-        
-        <nav>
+                </div> </div> <nav>
             <ul>
                 <li class="has-submenu">
                     <a href="{{ url_for('hr_management') }}">인사 관리</a>
@@ -49,8 +54,7 @@
                     {% endif %}
                 </li>
                 <li><a href="{{ url_for('attendance') }}">근태 관리</a></li> 
-                
-                {# 급여 관리 링크 #}
+                {# ✨ [수정] 급여 관리 링크 연결 #}
                 <li><a href="{{ url_for('salary_management') }}">급여 관리</a></li> 
                 
                 <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
@@ -75,7 +79,7 @@
         </div>
     {% endif %}
 
-    {# "content" 블록의 이름을 "page_content"로 사용합니다 #}
+    {# "page_content" 블록에 실제 페이지 내용이 들어갑니다. #}
     {% block page_content %}
     {% endblock %}
     
@@ -92,23 +96,17 @@
         }
         // 브라우저 저장소에 현재 클릭 시간을 기록합니다.
         localStorage.setItem('lastClockTime', Date.now());
-        // (선택 사항) 제출 직후 버튼을 비활성화할 수도 있습니다.
-        // button.disabled = true;
-        // button.style.cursor = 'wait';
-        // button.innerText = '처리중...';
         return true; // 폼 제출을 허용합니다.
     }
 
     // 이 함수는 페이지가 로드될 때마다 실행됩니다.
     window.addEventListener('load', () => {
-        // 모든 출퇴근 버튼 폼을 찾습니다 (출근/퇴근 폼이 둘 다 있을 수 있으므로)
         const forms = document.querySelectorAll('.attendance-section form');
         
         forms.forEach(form => {
             const button = form.querySelector('.attendance-btn');
             if (!button) return;
 
-            // 폼에 이벤트 리스너 추가 (기존 onsubmit 제거)
             form.onsubmit = function() { return handleSubmit(this); };
 
             const lastClockTime = localStorage.getItem('lastClockTime');
@@ -132,13 +130,16 @@
                         }
                     }, 1000);
 
-                    // 남은 시간만큼만 기다렸다가 버튼을 다시 활성화합니다.
                     setTimeout(() => {
                         clearInterval(interval);
                         button.disabled = false;
                         button.style.cursor = 'pointer';
                         // 버튼 텍스트는 서버에서 새로 렌더링된 값이므로 그대로 둡니다.
-                        button.innerText = button.classList.contains('check-in') ? '출근' : '퇴근';
+                        if (button.classList.contains('check-in')) {
+                            button.innerText = '출근';
+                        } else if (button.classList.contains('check-out')) {
+                            button.innerText = '퇴근';
+                        }
                     }, remainingTime);
                 }
             }
@@ -147,4 +148,3 @@
 </script>
 
 {% endblock %}
-

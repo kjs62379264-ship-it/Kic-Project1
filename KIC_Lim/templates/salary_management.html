@@ -10,7 +10,7 @@
         {% if is_admin %}
             <div>직원별 기본 급여 정보 관리</div>
             <div class="header-actions">
-                <!-- 월별 급여 계산 폼 -->
+                {# 월별 급여 계산 폼 #}
                 <form method="POST" action="{{ url_for('record_monthly_payroll') }}" 
                       onsubmit="return confirm('{{ current_month }} 급여를 확정하고 기록하시겠습니까? (중복 기록 불가)');" 
                       style="display: flex; gap: 10px;">
@@ -60,7 +60,7 @@
                         </td>
                         <td>{{ emp['contract_type'] if emp['contract_type'] else '-' }}</td>
                         <td style="text-align: center;">
-                            {# 급여 정보 등록/수정 버튼 #}
+                            {# 급여 정보 등록/수정 버튼 (edit_salary.html로 연결) #}
                             <a href="{{ url_for('add_salary_info', employee_id=emp['id']) }}" class="detail-btn">
                                 {{ '수정' if emp['base_salary'] else '등록' }}
                             </a>
@@ -118,7 +118,7 @@
                         <td style="text-align: right; color: #e74c3c;">- {{ "{:,}".format(record['deductions']) }}원</td>
                         <td style="text-align: right; font-weight: bold;">{{ "{:,}".format(record['net_pay']) }}원</td>
                         <td style="text-align: center;">
-                            {# ✨ [핵심 수정] pay_date를 쿼리 파라미터로 전달하여 상세 조회 #}
+                            {# ✨ [수정] pay_date를 쿼리 파라미터로 전달 #}
                             <a href="{{ url_for('view_payroll', employee_id=g.user.id, pay_date=record['pay_date']) }}" class="detail-btn">상세 조회</a>
                         </td>
                     </tr>

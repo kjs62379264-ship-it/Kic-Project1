@@ -9,8 +9,10 @@
     <div class="card-header employee-list-header">
         <div>근무 리스트 ({{ employees | length }}명)</div>
         <div class="header-actions">
+            {# ✨ 근태 요청 버튼 추가 #}
+            <a href="{{ url_for('add_leave_request') }}" class="main-action-btn header-btn">✈️ 근태 요청</a>
             <input type="date" value="{{ today_date }}" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
-            <a href="#" class="sub-action-btn header-btn">⟳ 오늘</a>
+            <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn">⟳ 오늘</a>
         </div>
     </div>
     
@@ -38,15 +40,14 @@
                         {% endfor %}
                     </select>
                 </span>
-                
+
                 <span>상태: 
                     <select name="status">
                         <option value="" {% if request.args.get('status', '') == '' %}selected{% endif %}>-- 전체 --</option>
                         <option value="재실" {% if request.args.get('status') == '재실' %}selected{% endif %}>재실</option>
                         <option value="휴가" {% if request.args.get('status') == '휴가' %}selected{% endif %}>휴가</option>
                         <option value="부재" {% if request.args.get('status') == '부재' %}selected{% endif %}>부재</option>
-                        <option value="외근" {% if request.args.get('status') == '외근' %}selected{% endif %}>외근</option>
-                        <option value="출장" {% if request.args.get('status') == '출장' %}selected{% endif %}>출장</option>
+                        <option value="외근/출장" {% if request.args.get('status') == '외근/출장' %}selected{% endif %}>외근/출장</option>
                     </select>
                 </span>
 
@@ -62,7 +63,7 @@
         <table class="employee-table">
             <thead>
                 <tr>
-                    <th style="width: 80px;">상태</th>
+                    <th style="width: 100px;">상태</th>
                     <th>사번</th> 
                     <th>이름</th>
                     <th>부서</th>
@@ -73,22 +74,22 @@
                 </tr>
             </thead>
             <tbody>
-            {% for emp in employees %}
-            <tr style="{% if emp['status'] == '휴가' %}background-color: #f7f7f7; color: #999;{% elif emp['status'] == '부재' %}background-color: #ffebee;{% elif emp['status'] in ['외근', '출장'] %}background-color: #ecf0f1;{% endif %}">
-                <td style="font-weight: bold; text-align: center;">
-                    {% if emp['status'] == '재실' %}
-                        <span style="color: #2ecc71;">● 재실</span>
-                    {% elif emp['status'] == '휴가' %}
-                        <span style="color: #3498db;">✈️ 휴가</span>
-                    {% elif emp['status'] == '부재' %}
-                        <span style="color: #e74c3c;">⚠️ 부재</span>
-                    {% elif emp['status'] == '외근' %}
-                        <span style="color: #f39c12;">🚗 외근</span>
-                    {% elif emp['status'] == '출장' %}
-                        <span style="color: #1abc9c;">💼 출장</span>
-                    {% else %}
-                        {{ emp['status'] }}
-                    {% endif %}
+            {% for emp in filtered_employees %}
+            {% set status_icon = '●' if emp['status'] == '재실' or emp['status'] == '퇴근'
+                                 else '✈️' if emp['status'] in ['연차', '오전 반차', '오후 반차', '병가', '기타']
+                                 else '🚗' if emp['status'] in ['외근', '출장'] 
+                                 else '⚠️' %}
+
+            <tr style="{% if emp['status'] == '부재' %}background-color: #ffebee;{% endif %}">
+                <td style="font-weight: bold; text-align: left;">
+                    <span style="color: 
+                        {% if emp['status'] == '재실' or emp['status'] == '퇴근' %}#2ecc71
+                        {% elif emp['status'] in ['연차', '오전 반차', '오후 반차', '병가', '기타'] %}#3498db
+                        {% elif emp['status'] in ['외근', '출장'] %}#f39c12
+                        {% else %}#e74c3c
+                        {% endif %};">
+                        {{ status_icon }} {{ emp['status'] }}
+                    </span>
                 </td>
                 
                 <td>{{ emp['id'] }}</td> 
@@ -116,13 +117,13 @@
             <div class="circle green-bg">
                 <span class="count">{{ status_counts['재실'] }}</span>명
             </div>
-            <div class="label">재실</div>
+            <div class="label">재실/퇴근</div>
         </div>
         <div class="status-circle-item">
             <div class="circle blue-bg">
                 <span class="count">{{ status_counts['휴가'] }}</span>명
             </div>
-            <div class="label">휴가</div>
+            <div class="label">휴가/병가</div>
         </div>
         <div class="status-circle-item">
             <div class="circle orange-bg">
@@ -134,18 +135,20 @@
             <div class="circle red-bg">
                 <span class="count">{{ status_counts['부재'] }}</span>명
             </div>
-            <div class="label">부재</div>
+            <div class="label">미출근 (부재)</div>
         </div>
     </div>
 </div>
 
 <div class="card attendance-box-bottom-right">
-    <div class="card-header">근태 요청 현황</div>
-    <div class="card-body" style="padding-bottom: 5px; 
-                                 display: flex; 
-                                 flex-direction: column; 
-                                 /* ✅ [핵심] 테이블 내용이 많아도 카드가 늘어나도록 flex-grow: 1 제거 */
-                                 ">
+    <div class="card-header">
+        <span>근태 요청 현황 ({{ '미승인' if g.user.role == 'admin' else '나의 전체 요청' }})</span>
+        {# ✨ 일반 직원 모드에서만 요청 버튼 추가 #}
+        {% if g.user.role != 'admin' %}
+        <a href="{{ url_for('add_leave_request') }}" class="sub-action-btn header-btn">➕ 요청하기</a>
+        {% endif %}
+    </div>
+    <div class="card-body" style="padding-bottom: 5px; display: flex; flex-direction: column;">
         
         <div style="overflow-y: auto;">
             <table class="employee-table" style="font-size: 0.9em; width: 100%;">
@@ -161,10 +164,16 @@
                 <tbody>
                 {% for req in pending_requests %}
                     <tr>
-                        <td>{{ req['name'] }} ({{ req['dept_code'] }})</td> 
-                        <td>{{ req['type'] }}</td>
-                        <td>{{ req['period'] }}</td>
-                        <td>{{ req['request_date'] }}</td>
+                        <td>{{ req['name'] }} ({{ req['department'][:2] }})</td> 
+                        <td>{{ req['request_type'] }}</td>
+                        {# 시작일과 종료일이 같으면 하루만 표시 #}
+                        <td>
+                            {{ req['start_date'] | replace('-', '.') }}
+                            {% if req['start_date'] != req['end_date'] %}
+                                ~ {{ req['end_date'] | replace('-', '.') }}
+                            {% endif %}
+                        </td>
+                        <td>{{ req['requested_at'].split(' ')[0] | replace('-', '.') }}</td>
                         
                         <td style="text-align: center;">
                             {% if req['status'] == '승인' %}
@@ -173,33 +182,40 @@
                                 <span class="status-indicator rejected">반려</span>
                             {% else %}
                                 <span class="status-indicator pending">미승인</span>
+                                
+                                {# ✨ [관리자 전용] 승인/반려 폼 #}
+                                {% if g.user.role == 'admin' %}
+                                <form method="POST" action="{{ url_for('process_leave_request', request_id=req['id']) }}" style="display: inline-flex; gap: 5px; margin-left: 5px;">
+                                    <button type="submit" name="action" value="승인" class="detail-btn" style="background-color: #2ecc71; color: white; padding: 3px 6px;">O</button>
+                                    <button type="submit" name="action" value="반려" class="detail-btn" style="background-color: #e74c3c; color: white; padding: 3px 6px;">X</button>
+                                </form>
+                                {% endif %}
                             {% endif %}
                         </td>
                     </tr>
                 {% endfor %}
                 
-                {% set num_rows_to_add = 3 - pending_requests|length %}
-                {% if num_rows_to_add > 0 %}
-                    {% for i in range(num_rows_to_add) %}
-                        <tr>
-                            <td colspan="5" style="height: 35px; background-color: #fcfcfc; border: none;"></td>
-                        </tr>
-                    {% endfor %}
-                {% endif %}
-                
-                {% if total_requests == 0 and pending_requests|length == 0 %}
+                {# 요청이 있지만 페이지당 개수보다 적을 때 빈 칸 채우기 (UX 개선) #}
+                {% if total_requests == 0 %}
                     <tr>
                         <td colspan="5" style="text-align: center; color: #7f8c8d; height: 105px;">현재 근태 요청 목록이 없습니다.</td>
                     </tr>
+                {% elif pending_requests|length < 3 %}
+                    {% set num_rows_to_add = 3 - pending_requests|length %}
+                    {% for i in range(num_rows_to_add) %}
+                        <tr><td colspan="5" style="height: 35px; background-color: #fcfcfc; border: none;"></td></tr>
+                    {% endfor %}
                 {% endif %}
+                
                 </tbody>
             </table>
         </div>
 
+        {# 페이지네이션 #}
         {% if total_pages > 1 %}
         <div style="margin-top: 10px; text-align: center; padding: 5px 0; flex-shrink: 0;"> 
             {% for p in range(1, total_pages + 1) %}
-                {% set page_url = url_for('attendance', pending_page=p) %}
+                {% set page_url = url_for('attendance', pending_page=p, **request.args) %}
                 <a href="{{ page_url }}" 
                    style="display: inline-block; padding: 5px 10px; margin: 0 2px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; font-size: 0.9em;
                           {% if p == current_pending_page %}background-color: #3498db; color: white; border-color: #3498db;{% else %}background-color: white; color: #333;{% endif %}">
@@ -210,9 +226,5 @@
         {% endif %}
     </div>
 </div>
-
-<script>
-    // ... (JavaScript 로직 유지) ...
-</script>
 
 {% endblock %}

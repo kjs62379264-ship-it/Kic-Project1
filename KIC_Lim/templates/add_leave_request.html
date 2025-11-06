@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block page_title %}근태 요청 제출{% endblock %}
+
+{% block page_content %}
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header employee-list-header">
+        <span>근태 요청서 작성</span>
+        <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn">🔙 근태 현황으로</a>
+    </div>
+    <div class="card-body">
+        
+        <form method="POST" action="{{ url_for('add_leave_request') }}">
+            
+            <div class="form-group">
+                <label for="request_type">요청 유형</label>
+                <select id="request_type" name="request_type" required>
+                    <option value="">-- 선택 --</option>
+                    <option value="연차">연차 (유급휴가)</option>
+                    <option value="오전 반차">오전 반차</option>
+                    <option value="오후 반차">오후 반차</option>
+                    <option value="병가">병가 (무급휴가)</option>
+                    <option value="외근">외근</option>
+                    <option value="출장">출장</option>
+                    <option value="기타">기타 휴가/부재</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="start_date">시작일</label>
+                <input type="date" id="start_date" name="start_date" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="end_date">종료일</label>
+                <input type="date" id="end_date" name="end_date" required>
+                <small style="color: #7f8c8d;">반차의 경우에도 시작일과 종료일을 동일하게 선택해주세요.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="reason">사유 (상세)</label>
+                <textarea id="reason" name="reason" rows="4" required></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn main-action-btn">제출하기</button>
+                <a href="{{ url_for('attendance') }}" class="btn sub-action-btn">취소</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
