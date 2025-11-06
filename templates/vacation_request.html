@@ -66,7 +66,7 @@
             </table>
 
             <p style="font-size: 0.95em; margin-bottom: 30px;">
-                상기 본인은 휴가 규정에 따라 아래와 같이 휴가를 신청하오니 허가하여 주시기 바랍니다.
+                상기 본인은 휴가 규정에 따라 아래와 같이 휴가를 신청합니다.
             </p>
 
             <h3 style="font-size: 1em; text-align: center; margin: 30px 0;">— 아 래 —</h3>
@@ -78,13 +78,13 @@
             </div>
 
             <p style="text-align: right; margin-top: 50px; font-size: 0.9em;">
-                <span id="preview-date">{{ "now"|datetimeformat('%Y년 %m월 %d일') }}</span>
+                <span id="preview-date">{{ "now"|datetimeformat('%Y년 %m월 %d일') }}</span> 
                 <br><br>
-                신청인: <span style="font-weight: bold; text-decoration: underline;">{{ g.user['name'] }}</span> (서명 또는 인)
-            </p>
+                신청인: <span style="font-weight: bold; text-decoration: none;">{{ g.user['name'] }}</span> (서명 또는 인) 
+                </p>
             
             <p style="text-align: center; margin-top: 50px; font-weight: bold;">
-                주식회사 OOOOOOOO 대표이사 귀중
+                주식회사 I-TEK 대표이사 김명지
             </p>
         </div>
     </div>
@@ -113,7 +113,8 @@
                     return `${parts[0]}. ${parts[1]}. ${parts[2]}.`;
                 };
                 
-                durationText = `${format(startDate)} ~ ${format(endDate)} (${leaveType})`;
+                // ✅ [핵심 수정] 휴가 종류(leaveType)를 기간 표시에서 완전히 제거
+                durationText = `${format(startDate)} ~ ${format(endDate)}`; 
             }
             document.getElementById('preview-duration').textContent = durationText;
 
@@ -125,8 +126,6 @@
         // 페이지 로드 시 초기값 설정 및 이벤트 리스너 연결
         const formElements = document.querySelectorAll('#vacation-form input, #vacation-form select, #vacation-form textarea');
         formElements.forEach(el => {
-            // 이미 onchange/oninput이 인라인으로 연결되어 있으므로, 
-            // 여기서는 페이지 로드 시 한 번 호출하여 기본 DB 정보를 반영합니다.
             el.addEventListener('input', updatePreview);
             el.addEventListener('change', updatePreview);
         });
