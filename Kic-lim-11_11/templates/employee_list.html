@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{# '인사 관리' 대신 '사원 명부'로 제목 변경 #}
+{% block page_title %}사원 명부{% endblock %}
+
+{% block page_content %}
+
+{# 기존 hr_management.html의 직원 명부 카드 #}
+<div class="card employee-list-container" style="grid-column: 1 / 3;">
+    
+    <div class="card-header employee-list-header">
+        <div>직원 명부 (총 {{ employee_count }}명)</div>
+        <div class="header-actions">
+            {% if g.user.role == 'admin' %}
+            <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="sub-action-btn header-btn">🖨️ 명부 인쇄</a>
+            <a href="{{ url_for('add_employee') }}" class="main-action-btn header-btn">➕ 신규 직원 등록</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
+        <form method="GET" action="{{ url_for('employee_list') }}"> {# ⬅️ action 경로 수정 #}
+            <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; flex-grow: 1;">
+                    <span>사번: <input type="text" name="id" placeholder="사번으로 검색" style="width: 120px;" value="{{ request.args.get('id', '') }}"></span>
+                    <span>이름: <input type="text" name="name" placeholder="이름으로 검색" style="width: 120px;" value="{{ request.args.get('name', '') }}"></span>
+                    <span>부서: 
+                        <select name="department">
+                            <option value="" {% if request.args.get('department', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>
+                                {{ dept['name'] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </span>
+                    <span>직급: 
+                        <select name="position">
+                            <option value="" {% if request.args.get('position', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            {% for pos in positions %}
+                            <option value="{{ pos['name'] }}" {% if request.args.get('position') == pos['name'] %}selected{% endif %}>
+                                {{ pos['name'] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </span>
+                    <span>성별: 
+                        <select name="gender">
+                            <option value="" {% if request.args.get('gender', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            <option value="남성" {% if request.args.get('gender') == '남성' %}selected{% endif %}>남성</option>
+                            <option value="여성" {% if request.args.get('gender') == '여성' %}selected{% endif %}>여성</option>
+                        </select>
+                    </span>
+                    <span>상태: 
+                        <select name="status">
+                            <option value="재직" {% if request.args.get('status', '재직') == '재직' %}selected{% endif %}>재직</option>
+                            <option value="퇴사" {% if request.args.get('status') == '퇴사' %}selected{% endif %}>퇴사</option>
+                            <option value="전체" {% if request.args.get('status') == '전체' %}selected{% endif %}>전체</option>
+                        </select>
+                    </span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-left: auto;">
+                    <button type="submit" class="sub-action-btn header-btn">검색</button>
+                    {# ⬅️ 초기화 링크 수정 #}
+                    <a href="{{ url_for('employee_list') }}" class="sub-action-btn header-btn" style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card-body">
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th>사번</th>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>직급</th>
+                    <th>상세</th> 
+                </tr>
+            </thead>
+            <tbody>
+            {% for employee in employees %}
+            <tr class="{{ 'resigned' if employee['status'] == '퇴사' else '' }}">
+                <td>{{ employee['id'] }}</td>
+                <td>{{ employee['name'] }}</td>
+                <td>{{ employee['department'] }}</td>
+                <td>{{ employee['position'] }}</td>
+                <td>
+                    <a href="{{ url_for('employee_detail', employee_id=employee['id']) }}" class="detail-btn">조회</a>
+                </td> 
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center;">등록된 직원이 없습니다.</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
