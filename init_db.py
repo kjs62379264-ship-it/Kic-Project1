@@ -1,6 +1,6 @@
 import sqlite3
 from werkzeug.security import generate_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 
 conn = sqlite3.connect('employees.db')
 cursor = conn.cursor()
@@ -13,7 +13,11 @@ cursor.execute("DROP TABLE IF EXISTS email_domains")
 cursor.execute("DROP TABLE IF EXISTS attendance")
 cursor.execute("DROP TABLE IF EXISTS notices")
 cursor.execute("DROP TABLE IF EXISTS users")
-cursor.execute("DROP TABLE IF EXISTS vacation_requests")
+cursor.execute("DROP TABLE IF EXISTS salary")
+cursor.execute("DROP TABLE IF EXISTS allowances")
+cursor.execute("DROP TABLE IF EXISTS deductions")
+# ✨ [추가] 휴가 요청 테이블 삭제
+cursor.execute("DROP TABLE IF EXISTS leave_requests")
 
 print("기존 테이블 모두 삭제 완료.")
 
@@ -59,67 +63,58 @@ CREATE TABLE notices (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );""")
 cursor.execute("""
-CREATE TABLE vacation_requests (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id TEXT NOT NULL,                  -- 신청한 직원의 사번 (외래 키)
-    name TEXT NOT NULL,                     -- 직원의 이름 (조회 편의성)
-    department TEXT NOT NULL,               -- 직원의 부서 (조회 편의성)
-    request_type TEXT NOT NULL,             -- 연차, 오전 반차, 병가 등
-    start_date TEXT NOT NULL,               -- 휴가 시작일 (YYYY-MM-DD)
-    end_date TEXT NOT NULL,                 -- 휴가 종료일 (YYYY-MM-DD)
-    reason TEXT,                            -- 신청 사유
-    request_date DATETIME DEFAULT CURRENT_TIMESTAMP, -- 신청일시
-    status TEXT NOT NULL DEFAULT '대기',      -- 처리 현황 (대기, 승인, 반려)
-    FOREIGN KEY (user_id) REFERENCES employees (id)
+CREATE TABLE salary (
+    employee_id TEXT PRIMARY KEY,
+    annual_salary INTEGER NOT NULL,
+    monthly_base INTEGER NOT NULL,
+    start_date DATE NOT NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees (id)
 );""")
-print("모든 테이블 생성 완료.")
+cursor.execute("""
+CREATE TABLE allowances (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    is_monthly BOOLEAN NOT NULL DEFAULT 1,
+    FOREIGN KEY (employee_id) REFERENCES employees (id)
+);""")
+cursor.execute("""
+CREATE TABLE deductions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    is_rate BOOLEAN NOT NULL DEFAULT 0,
+    FOREIGN KEY (employee_id) REFERENCES employees (id)
+);""")
+# ✨ [추가] 휴가 요청 테이블
+cursor.execute("""
+CREATE TABLE leave_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    employee_id TEXT NOT NULL,
+    leave_type TEXT NOT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    reason TEXT,
+    request_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    # '미승인', '승인', '반려'
+    status TEXT NOT NULL DEFAULT '미승인', 
+    FOREIGN KEY (employee_id) REFERENCES employees (id)
+);""")
+print("모든 테이블 생성 완료 (급여, 휴가 요청 테이블 포함).")
+
 
 # --- 4. 초기 데이터 삽입 ---
 
 # (1) 직원 정보 (employees)
 employees_data = [
-    # 기존 5명
     ('25HR0001', '홍길동', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'profile_5.jpg'),
     ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'profile_2.jpg'),
     ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'profile_3.jpg'),
     ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'profile_4.jpg'),
     ('admin', '관리자', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
 ]
-
-'''
-# ✨ 더미 직원 20명 정보 추가
-dummy_departments = [d[0] for d in departments_list if d[0] != '시스템']
-dummy_positions = [p[0] for p in positions_list if p[0] not in ('관리자', '팀장')] # 팀장 제외
-dummy_genders = ['남성', '여성']
-'''
-
-# 부서별 카운터 초기화 (기존 ID 다음 번호부터 시작하도록)
-dept_counters = {'HR': 1, 'DV': 1, 'DS': 1, 'MK': 1, 'SL': 0, 'FN': 0}
-
-'''
-for i in range(1, 21):
-    emp_number = i + 4 # 기존 직원 4명 다음부터 번호 매기기
-    dept = dummy_departments[(i-1) % len(dummy_departments)] # 부서를 순환하며 배정
-    pos = dummy_positions[(i-1) % len(dummy_positions)]     # 직급을 순환하며 배정
-    gender = dummy_genders[(i-1) % len(dummy_genders)]       # 성별을 순환하며 배정
-
-    # 사번 생성 (예: 25SL0001, 25FN0001, 25HR0002 ...)
-    dept_code = next(code for name, code in departments_list if name == dept)
-    dept_counters[dept_code] += 1
-    emp_id = f"25{dept_code}{dept_counters[dept_code]:04d}"
-
-    name = f"테스트{emp_number}"
-    hire_y = 2024 + (i % 2) # 입사년도 2024 또는 2025
-    hire_m = (i % 12) + 1   # 입사월 1~12
-    hire_d = (i % 28) + 1   # 입사일 1~28
-    hire_date = f"{hire_y}-{hire_m:02d}-{hire_d:02d}"
-    phone = f"010-{1000+i:04d}-{1000+i:04d}"
-    email = f"test{emp_number}@company.com"
-    address = f"테스트 주소 {emp_number}"
-    profile_img = f"dummy_{i}.jpg" # 프로필 이미지 파일명 (실제 파일은 없음)
-
-    employees_data.append((emp_id, name, dept, pos, hire_date, phone, email, address, gender, '재직', profile_img))
-'''
 
 cursor.executemany("""
     INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
@@ -128,7 +123,6 @@ cursor.executemany("""
 
 # (2) 로그인 정보 (users)
 users_data = [
-    # 기존 5명
     ('25HR0001', '25HR0001', generate_password_hash('1234'), 'admin'),
     ('25DV0001', '25DV0001', generate_password_hash('1234'), 'user'),
     ('25DS0001', '25DS0001', generate_password_hash('1234'), 'user'),
@@ -136,11 +130,9 @@ users_data = [
     ('admin', 'admin', generate_password_hash('0000'), 'admin'),
 ]
 
-# ✨ 추가된 20명에 대한 user 데이터 생성 (모두 role='user', pw='1234')
 default_password_hash = generate_password_hash('1234')
-for emp_data in employees_data[5:]: # 기존 5명 제외
+for emp_data in employees_data[5:]: 
     emp_id = emp_data[0]
-    # 'admin' 계정은 이미 users_data에 있으므로 건너뜀
     if emp_id != 'admin':
         users_data.append((emp_id, emp_id, default_password_hash, 'user'))
 
@@ -152,9 +144,91 @@ cursor.executemany("""
 # (3) 샘플 공지사항
 cursor.execute("INSERT INTO notices (title, content) VALUES (?, ?)", ('환영합니다!', '인사관리 시스템이 오픈되었습니다.'))
 
-print("초기 데이터 삽입 완료.")
+
+# (4) 급여 테이블 (salary) 초기 데이터
+employees_to_salary = [emp[0] for emp in employees_data]
+salary_data = []
+for emp_id in employees_to_salary:
+    base_salary = 60000000 if emp_id == 'admin' else 36000000
+    monthly_base = base_salary // 12
+    salary_data.append((emp_id, base_salary, monthly_base, '2025-01-01'))
+
+cursor.executemany("""
+    INSERT INTO salary (employee_id, annual_salary, monthly_base, start_date)
+    VALUES (?, ?, ?, ?)
+""", salary_data)
+print("초기 급여 정보 삽입 완료.")
+
+# (5) 수당 테이블 (allowances) 초기 데이터
+allowances_data = []
+for emp_id in employees_to_salary:
+    allowances_data.append((emp_id, '식대', 100000, 1))
+    allowances_data.append((emp_id, '교통비', 50000, 1))
+    if emp_id == 'admin' or emp_id == '25HR0001':
+        allowances_data.append((emp_id, '직책수당', 300000, 1))
+
+cursor.executemany("""
+    INSERT INTO allowances (employee_id, type, amount, is_monthly)
+    VALUES (?, ?, ?, ?)
+""", allowances_data)
+print("초기 수당 정보 삽입 완료.")
+
+# (6) 공제 테이블 (deductions) 초기 데이터
+deductions_data = [
+    (emp_id, '국민연금', 450, 1) for emp_id in employees_to_salary
+] + [
+    (emp_id, '건강보험', 3545, 1) for emp_id in employees_to_salary
+] + [
+    (emp_id, '고용보험', 90, 1) for emp_id in employees_to_salary
+] + [
+    (emp_id, '소득세', 120000, 0) for emp_id in employees_to_salary
+]
+
+cursor.executemany("""
+    INSERT INTO deductions (employee_id, type, amount, is_rate)
+    VALUES (?, ?, ?, ?)
+""", deductions_data)
+print("초기 공제 정보 삽입 완료.")
+
+# (7) 샘플 근태 기록 (attendance) 추가
+today = datetime.now().date()
+yesterday = today - timedelta(days=1)
+two_days_ago = today - timedelta(days=2)
+three_days_ago = today - timedelta(days=3)
+
+attendance_data = [
+    ('25HR0001', yesterday.strftime('%Y-%m-%d'), '08:50:00', '18:00:00', '정상'),
+    ('25HR0001', two_days_ago.strftime('%Y-%m-%d'), '09:05:00', '18:00:00', '지각'), 
+    ('25DV0001', yesterday.strftime('%Y-%m-%d'), '09:03:00', '18:00:00', '지각'), 
+    ('25DV0001', three_days_ago.strftime('%Y-%m-%d'), '08:45:00', '19:30:00', '정상'),
+    ('25DV0001', today.strftime('%Y-%m-%d'), '08:58:00', None, '정상'), # 오늘 근무중 테스트용
+]
+
+cursor.executemany("""
+    INSERT INTO attendance (employee_id, record_date, clock_in_time, clock_out_time, attendance_status)
+    VALUES (?, ?, ?, ?, ?)
+""", attendance_data)
+print("샘플 근태 기록 삽입 완료.")
+
+
+# (8) 샘플 휴가 요청 (leave_requests) 추가
+vacation_data = [
+    # 미승인 요청 (김개발)
+    ('25DV0001', '연차', '2025-11-20', '2025-11-20', '가족 행사 참석', '미승인'),
+    # 승인된 요청 (홍길동)
+    ('25HR0001', '병가', '2025-12-05', '2025-12-06', '수술 후 회복', '승인'),
+    # 반려된 요청 (이디자인)
+    ('25DS0001', '오후 반차', '2025-11-15', '2025-11-15', '병원 검진', '반려'),
+]
+for emp_id, type, start, end, reason, status in vacation_data:
+    cursor.execute("""
+        INSERT INTO leave_requests (employee_id, leave_type, start_date, end_date, reason, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (emp_id, type, start, end, reason, status))
+print("샘플 휴가 요청 삽입 완료.")
+
 
 conn.commit()
 conn.close()
 
-print(f"데이터베이스 초기화가 성공적으로 완료되었습니다. 총 직원 수 (시스템 관리자 제외): {len(employees_data) - 1}")
+print(f"데이터베이스 초기화가 성공적으로 완료되었습니다. 총 직원 수 (시스템 관리자 포함): {len(employees_data)}")
