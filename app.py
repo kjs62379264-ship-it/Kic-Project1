@@ -392,8 +392,7 @@ def root():
 @app.route('/attendance')
 @login_required 
 def attendance():
-    # (새 시스템의 근태 현황 로직 그대로 유지)
-    # ... (생략) ...
+    # 1. 필터 쿼리 파라미터 (기존 유지)
     id_query = request.args.get('id', '')
     name_query = request.args.get('name', '')
     department_query = request.args.get('department', '')
@@ -404,32 +403,26 @@ def attendance():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 2. 근무 리스트 조회 (기존 임시 로직 유지)
     today_attendance_data = {}
-    # ✨ [버그 수정] 'admin' 계정은 근태 현황 목록에서 제외
     cursor.execute("SELECT * FROM employees WHERE id != 'admin' ORDER BY id")
     all_employees = cursor.fetchall()
     
-    # (이하 임시 로직은 새 코드 그대로 유지)
-    # ... (생략) ...
+    # (임시 로직: DB 연동 전까지 하드코딩된 상태)
     for emp in all_employees:
         emp_id = emp['id']
-        status = '부재' # 기본값
+        status = '부재' 
         check_in = None
         
-        if emp_id == '25HR0001': # 관리자
+        if emp_id == '25HR0001': 
             status = '재실'
             check_in = '08:50'
-        elif emp_id == '25DV0002': # 일반직원
+        elif emp_id == '25DV0002': 
             status = '휴가'
-        elif emp_id == '25DV0003': # 김개발
+        elif emp_id == '25DV0003': 
             status = '재실'
             check_in = '09:05'
-        elif emp_id == '25HR0005': # 이인사
-            status = '출장'
-            check_in = '08:40'
-        elif emp_id == '25DS0006': # 최디자인
-            status = '외근'
-            check_in = '09:10'
+        # ... (다른 임시 직원 상태)...
         
         today_attendance_data[emp_id] = {
             **dict(emp), 
@@ -439,6 +432,7 @@ def attendance():
             'leave_status': '연차' if status == '휴가' else None
         }
     
+    # 3. 근무 리스트 필터링 (기존 유지)
     total_employees_count = len(today_attendance_data)
     filtered_employees = []
     
@@ -452,67 +446,73 @@ def attendance():
         if match:
             filtered_employees.append(emp)
 
+    # 4. 근무 현황 서클 통계 (기존 유지)
     total_onsite_count = 0 
-    total_leave_count = 0  
-    total_out_count = 0    
+    total_leave_count = 0
+    total_out_count = 0 
     total_absent_count = 0 
     status_counts = {'재실': 0, '휴가': 0, '외근/출장': 0, '부재': 0}
     
     for emp in today_attendance_data.values():
         status = emp['status']
         if status == '재실':
-            total_onsite_count += 1
             status_counts['재실'] += 1
         elif status == '휴가':
-            total_leave_count += 1
             status_counts['휴가'] += 1
         elif status in ['외근', '출장']:
-            total_out_count += 1
             status_counts['외근/출장'] += 1
         elif status == '부재': 
-            total_absent_count += 1
             status_counts['부재'] += 1
             
-    total_pending_count = 1 
+    total_onsite_count = status_counts['재실']
+    total_leave_count = status_counts['휴가']
+    total_out_count = status_counts['외근/출장']
+    total_absent_count = status_counts['부재']
+            
+    # 5. 드롭다운용 데이터 조회 (기존 유지)
     cursor.execute("SELECT name FROM departments ORDER BY name")
     departments = cursor.fetchall()
     cursor.execute("SELECT name FROM positions ORDER BY name")
     positions = cursor.fetchall()
+    
+    # ----------------------------------------------------
+    # ✅ [핵심 수정] 6. 근태 요청 현황 (DB에서 실제 데이터 조회)
+    # ----------------------------------------------------
+    cursor.execute("""
+        SELECT name, department, request_type, start_date, end_date, request_date, status 
+        FROM vacation_requests 
+        WHERE status IN ('대기', '승인') 
+        ORDER BY request_date DESC
+    """)
+    vacation_requests = cursor.fetchall() # 이 변수를 템플릿으로 전달합니다.
+    
     conn.close()
     
-    # (새 코드의 임시 'pending_requests' 데이터는 그대로 유지)
-    pending_requests = [
-        {'id': 101, 'employee_id': '25DV0002', 'name': '일반직원', 'department': '개발팀', 'dept_code': 'DV', 'type': '연차', 'period': '2025-10-25', 'reason': '개인사정', 'request_date': '2025-10-18', 'status': '미승인'},
-        {'id': 102, 'employee_id': '25MK0004', 'name': '박마케팅', 'department': '마케팅팀', 'dept_code': 'MK', 'type': '오전 반차', 'period': '2025-10-20', 'reason': '은행 업무', 'request_date': '2025-10-17', 'status': '미승인'},
-        {'id': 103, 'employee_id': '25HR0001', 'name': '관리자', 'department': '인사팀', 'dept_code': 'HR', 'type': '외근', 'period': '2025-10-20', 'reason': '미팅', 'request_date': '2025-10-16', 'status': '승인'},
-        {'id': 104, 'employee_id': '25DS0006', 'name': '최디자인', 'department': '디자인팀', 'dept_code': 'DS', 'type': '수정', 'period': '2025-10-21', 'reason': '일정 변경', 'request_date': '2025-10-19', 'status': '반려'},
-    ]
+    # ----------------------------------------------------
+    # ❌ [핵심 수정] 7. 오래된 임시 데이터 및 페이지네이션 로직 모두 제거
+    # ----------------------------------------------------
+    # (pending_requests = [...] 리스트 전체 삭제)
+    # (page = request.args.get(...) 관련 로직 전체 삭제)
     
-    page = request.args.get('pending_page', 1, type=int) 
-    PER_PAGE = 3
-    total_requests = len(pending_requests)
-    total_pages = (total_requests + PER_PAGE - 1) // PER_PAGE
-    start_index = (page - 1) * PER_PAGE
-    end_index = start_index + PER_PAGE
-    paginated_requests = pending_requests[start_index:end_index]
-    total_pending_count = len([req for req in pending_requests if req['status'] == '미승인'])
     
+    # 8. 템플릿 렌더링 (정리된 변수 전달)
     return render_template('attendance_page.html', 
                             employees=filtered_employees,
-                            pending_requests=paginated_requests,
                             total_employees_count=total_employees_count,
                             departments=departments, 
                             positions=positions,
                             request=request,
-                            total_requests=total_requests,
-                            total_pages=total_pages,
-                            current_pending_page=page,
                             total_onsite_count=total_onsite_count,
                             total_leave_count=total_leave_count,
                             total_out_count=total_out_count,
-                            total_pending_count=total_pending_count,
                             status_counts=status_counts,
-                            total_absent_count=total_absent_count)
+                            total_absent_count=total_absent_count,
+                            
+                            # ✅ [핵심 수정] 실제 DB 조회 결과를 'vacation_requests' 변수로 전달
+                            vacation_requests=vacation_requests 
+                            
+                            # ❌ (pending_requests, total_requests, total_pages 등 모두 제거됨)
+                           )
 
 @app.route('/attendance/employee/<employee_id>')
 @login_required # 모든 직원이 자신의 상세 정보를 볼 수 있어야 함
@@ -747,7 +747,7 @@ def datetimeformat(value, format='%Y년 %m월 %d일 %H:%M'):
         value = datetime.now()
 
     return value.strftime(format)
-
+    
 # 필터를 Jinja2 환경에 등록
 app.jinja_env.filters['datetimeformat'] = datetimeformat
 import calendar
@@ -1391,23 +1391,191 @@ def view_notice(notice_id):
     return render_template('notice_detail.html', notice=notice)
 
 # ----------------------------------------------------
-# 8. 연차/휴가 신청 라우트 (신규 추가)
+# 8. 연차/휴가/근무 신청 라우트 (수정)
 # ----------------------------------------------------
 @app.route('/vacation_request', methods=['GET', 'POST'])
 @login_required
 def vacation_request():
     
     if request.method == 'POST':
-        leave_type = request.form['leave_type']
-        start_date = request.form['start_date']
-        end_date = request.form['end_date']
-        reason = request.form.get('reason', '') 
+        # 1. DB 연결 및 공통 데이터 가져오기
+        conn = sqlite3.connect('employees.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
         
-        flash(f"'{leave_type}' 신청이 완료되었습니다. (기간: {start_date} ~ {end_date})", "success")
-        return redirect(url_for('my_attendance')) # 신청 후 나의 근태 현황 페이지로 이동
+        user_id = g.user['id']
+        name = g.user['name']
+        department = g.user['department']
+        request_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        form_type = request.form.get('form_type')
 
-    # GET 요청: vacation_request.html 폼 페이지 렌더링
-    return render_template('vacation_request.html')
+        try:
+            if form_type == 'vacation':
+                # -------------------------------------
+                # A. 휴가 신청 처리
+                # -------------------------------------
+                leave_type = request.form['leave_type']
+                start_date = request.form['start_date']
+                end_date = request.form['end_date']
+                reason = request.form.get('reason', '')
+                
+                cursor.execute(
+                    'INSERT INTO vacation_requests (user_id, name, department, request_type, start_date, end_date, reason, request_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (user_id, name, department, leave_type, start_date, end_date, reason, request_date, '대기')
+                )
+                flash(f"'{leave_type}' 신청이 완료되었습니다.", "success")
+            
+            elif form_type == 'work':
+                # -------------------------------------
+                # B. 근무 신청 처리 (수정)
+                # -------------------------------------
+                work_type = request.form['work_type'] 
+                work_start_date = request.form['work_start_date']
+                
+                # ✅ [핵심 수정] .get()을 사용하여 'work_end_date'를 안전하게 가져옵니다.
+                # '외근'/'재택'이라서 비활성화되어 값이 안 넘어오면 None이 됩니다.
+                work_end_date = request.form.get('work_end_date') 
+                
+                destination = request.form.get('destination', '')
+                work_reason = request.form.get('work_reason', '')
+                
+                combined_reason = f"장소: {destination} / 사유: {work_reason}"
+                
+                # 외근/재택의 경우 (work_end_date가 None이거나 비어있음) 종료일을 시작일로 강제
+                final_end_date = work_end_date
+                if work_type == '외근' or work_type == '재택근무' or not final_end_date:
+                    final_end_date = work_start_date
+                
+                cursor.execute(
+                    'INSERT INTO vacation_requests (user_id, name, department, request_type, start_date, end_date, reason, request_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (user_id, name, department, work_type, work_start_date, final_end_date, combined_reason, request_date, '대기')
+                )
+                flash(f"'{work_type}' 근무 신청이 완료되었습니다.", "success")
+            
+            else:
+                flash("알 수 없는 폼 유형입니다.", "error")
+
+            conn.commit()
+        
+        except sqlite3.Error as e:
+            conn.rollback()
+            flash(f'신청 제출 중 오류가 발생했습니다: {str(e)}', 'error')
+        
+        finally:
+            conn.close()
+
+        return redirect(url_for('my_attendance')) 
+    
+    # GET 요청: 
+    today_display_date = datetime.now().strftime('%Y년 %m월 %d일')
+    return render_template('vacation_request.html', 
+                           today_display_date=today_display_date)
+@app.route('/attendance_employee')
+@login_required
+@admin_required # 관리자만 접근 가능해야 합니다.
+def attendance_employee():
+    
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # ----------------------------------------------------
+    # ✅ 1. [수정] 현재 월 계산 (동적 제목용)
+    # ----------------------------------------------------
+    current_month = datetime.now().month # 예: 11 (숫자)
+
+    # ----------------------------------------------------
+    # ✅ 2. [수정] 임시 데이터에 'absence_count' (결근 횟수) 추가
+    # ----------------------------------------------------
+    # (향후 이 부분은 DB에서 JOIN과 COUNT/SUM으로 실제 계산해야 합니다)
+    employee_stats = [
+        {'id': '25HR0001', 'name': '홍길동', 'department': '인사팀', 'position': '과장', 'remaining_leave': 10.5, 'late_count': 1, 'absence_count': 0, 'overtime_hours': 5.5},
+        {'id': '25DV0001', 'name': '김개발', 'department': '개발팀', 'position': '대리', 'remaining_leave': 15.0, 'late_count': 3, 'absence_count': 1, 'overtime_hours': 10.0},
+        {'id': '25DS0001', 'name': '이디자인', 'department': '디자인팀', 'position': '주임', 'remaining_leave': 12.0, 'late_count': 0, 'absence_count': 0, 'overtime_hours': 0},
+    ]
+
+    conn.close()
+
+    return render_template('attendance_employee.html', 
+                           employee_stats=employee_stats,
+                           current_month=current_month) # ✅ 3. 현재 월 전달
+# ----------------------------------------------------
+# 9. [신규] 관리자용 직원 근태 상세 조회
+# ----------------------------------------------------
+# app.py - attendance_employee_detail(employee_id) 함수 전체를 대체합니다.
+
+@app.route('/attendance_employee_detail/<employee_id>')
+@login_required
+@admin_required # 관리자 전용
+def attendance_employee_detail(employee_id):
+    
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 1. 대상 직원 정보 조회
+    target_user = cursor.execute("SELECT id, name, department FROM employees WHERE id = ?", (employee_id,)).fetchone()
+    if not target_user:
+        flash("해당 직원을 찾을 수 없습니다.", "error")
+        conn.close()
+        return redirect(url_for('attendance_employee'))
+
+    # 2. 날짜 설정
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
+    start_date = date(year, month, 1)
+
+    # ----------------------------------------------------
+    # ✅ [핵심 추가] 3. 통계 요약 계산 (임시 데이터)
+    # ----------------------------------------------------
+    # (실제 구현 시, 이 값들은 DB 집계 쿼리를 통해 채워져야 합니다.)
+    
+    # ID에 따라 약간 다른 통계 데이터를 시뮬레이션
+    is_senior = (employee_id == '25HR0001')
+    
+    employee_stats_summary = {
+        'target_month': datetime.now().strftime('%Y년 %m월'),
+        'target_year': datetime.now().year,
+        
+        'monthly': {
+            'tardy_count': 2 if is_senior else 5,
+            'absent_count': 0 if is_senior else 1,
+            'offsite_days': 2,
+            'business_trip_days': 3,
+            'leave_days': 1.5 if is_senior else 2.0,
+            'overtime_hours': '12h 45m' if is_senior else '0h 0m',
+            'overtime_days_count': 4 if is_senior else 0
+        },
+        'yearly': {
+            'tardy_count': 18, 'absent_count': 4, 'offsite_days': 15, 'business_trip_days': 20,
+            'leave_days': 18.5, 'overtime_hours': '85h 30m', 'overtime_days_count': 25
+        }
+    }
+    
+    # 4. 달력 생성 (로직 유지)
+    all_records = [] # (실제 DB 조회로 대체해야 하지만, 현재는 빈 리스트로 둡니다.)
+    calendar_records = []
+    
+    # (my_attendance에서 가져온 임시 로직을 단순화하여 달력만 작동하게 합니다.)
+    today_date_obj = datetime.now().date()
+    calendar_records = [
+        {'record_date': date(year, month, 5), 'attendance_status': '휴가'},
+        {'record_date': date(year, month, 10), 'attendance_status': '지각'},
+    ]
+    calendar_html = create_attendance_calendar(year, month, calendar_records)
+    
+    conn.close()
+
+    return render_template('attendance_employee_detail.html', 
+                            target_user=target_user,
+                            employee_stats_summary=employee_stats_summary, # ✅ 통계 요약 전달
+                            calendar_html=calendar_html,
+                            # 달력 컨트롤 변수 유지
+                            current_year=year,
+                            current_month=month,
+                            current_month_name=start_date.strftime('%Y년 %m월')
+                            )
 # ----------------------------------------------------
 # 앱 실행
 # ----------------------------------------------------

@@ -1,23 +1,41 @@
 {% extends "base.html" %}
 
-{% block title %}연차/휴가 신청{% endblock %}
+{% block title %}근무/휴가 신청{% endblock %}
 {% block page_body_class %}vacation-request-page{% endblock %}
 
 {% block page_content %}
 
-<div class="two-column-form" style="grid-column: 1 / 3; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-
-    <div class="card" style="min-height: 700px;">
-        <div class="card-header">휴가 신청 정보 입력</div>
-        <div class="card-body">
+<div class="card" style="grid-column: 1 / 2; height: 100%; display: flex; flex-direction: column;">
+    <div class="card-header">
+        <div style="display: flex; width: 100%; justify-content: space-around;">
+            <button id="btn-show-leave" class="btn main-action-btn" style="width: 48%;" onclick="showForm('leave')">휴가 신청</button>
+            <button id="btn-show-work" class="btn sub-action-btn" style="width: 48%; background-color: #7f8c8d;" onclick="showForm('work')">근무 신청 (외근/출장)</button>
+        </div>
+    </div>
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto;">
+        
+        <form id="request-form" method="POST" action="{{ url_for('vacation_request') }}">
             
-            <form id="vacation-form" method="POST" action="{{ url_for('vacation_request') }}">
-                
-                <div class="form-group"><label>성명:</label> <span>{{ g.user['name'] }}</span></div>
-                <div class="form-group"><label>부서:</label> <span>{{ g.user['department'] }}</span></div>
-                <div class="form-group"><label>직급:</label> <span>{{ g.user['position'] }}</span></div>
-                <hr>
+            <input type="hidden" id="form_type" name="form_type" value="vacation">
+            
+            <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+                <div class="form-group" style="flex-grow: 1; min-width: 150px;">
+                    <label>성명:</label> 
+                    <span style="font-weight: bold;">{{ g.user['name'] }}</span>
+                </div>
+                <div class="form-group" style="flex-grow: 1; min-width: 150px;">
+                    <label>부서:</label> 
+                    <span>{{ g.user['department'] }}</span>
+                </div>
+                <div class="form-group" style="flex-grow: 1; min-width: 150px;">
+                    <label>직급:</label> 
+                    <span>{{ g.user['position'] }}</span>
+                </div>
+            </div>
+            <hr>
 
+            <div id="leave-form-section">
                 <div class="form-group">
                     <label for="leave_type">신청 유형</label>
                     <select id="leave_type" name="leave_type" required onchange="updatePreview()">
@@ -27,111 +45,278 @@
                         <option value="오후 반차">오후 반차</option>
                         <option value="병가">병가</option>
                         <option value="경조사">경조사 휴가</option>
-                        <option value="기타">기타</option>
                     </select>
                 </div>
-
                 <div class="form-group">
                     <label for="start_date">휴가 시작일</label>
                     <input type="date" id="start_date" name="start_date" required onchange="updatePreview()">
                 </div>
-
                 <div class="form-group">
                     <label for="end_date">휴가 종료일</label>
                     <input type="date" id="end_date" name="end_date" required onchange="updatePreview()">
                 </div>
-                
                 <div class="form-group">
                     <label for="reason">신청 사유</label>
                     <textarea id="reason" name="reason" rows="5" oninput="updatePreview()"></textarea>
                 </div>
-                
-                <div class="form-actions" style="margin-top: 30px;">
-                    <button type="submit" class="btn main-action-btn">최종 신청 및 제출</button>
-                    <a href="{{ url_for('my_attendance') }}" class="btn sub-action-btn">취소</a>
+            </div>
+
+            <div id="work-form-section" style="display: none;">
+                <div class="form-group">
+                    <label for="work_type">근무 유형</label>
+                    <select id="work_type" name="work_type" onchange="handleWorkTypeChange()">
+                        <option value="">-- 유형 선택 --</option>
+                        <option value="외근">외근</option>
+                        <option value="재택근무">재택근무</option>
+                        <option value="출장">출장</option>
+                    </select>
                 </div>
-            </form>
-        </div>
+                <div class="form-group">
+                    <label for="work_start_date">시작일</label>
+                    <input type="date" id="work_start_date" name="work_start_date" onchange="handleWorkTypeChange()">
+                </div>
+                <div class="form-group">
+                    <label for="work_end_date">종료일</label>
+                    <input type="date" id="work_end_date" name="work_end_date" onchange="updatePreview()">
+                </div>
+                <div class="form-group">
+                    <label for="destination">장소 (방문지)</label>
+                    <input type="text" id="destination" name="destination" oninput="updatePreview()">
+                </div>
+                <div class="form-group">
+                    <label for="work_reason">업무 사유</label>
+                    <textarea id="work_reason" name="work_reason" rows="5" oninput="updatePreview()"></textarea>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 30px;">
+                <button type="submit" class="btn main-action-btn">최종 신청 및 제출</button>
+                <a href="{{ url_for('my_attendance') }}" class="btn sub-action-btn">취소</a>
+            </div>
+        </form>
     </div>
+</div>
 
-    <div class="card" style="padding: 30px; min-height: 700px; background-color: white; border: 1px solid #ccc;">
-        <h2 style="text-align: center; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 10px;">휴가 신청서 (미리보기)</h2>
-        
-        <div id="preview-content" style="line-height: 1.8; font-family: serif; max-width: 500px; margin: 0 auto; padding-top: 20px;">
-            <p style="text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 40px;">휴가 신청서</p>
+<div class="card" style="grid-column: 2 / 3; height: 100%; display: flex; flex-direction: column;">
+    
+    <div class="card-header">
+        <h2 id="preview-title" style="text-align: center; margin: 0; font-size: 1.1em;">
+            휴가 신청서 (미리보기)
+        </h2>
+    </div>
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 30px;">
+        <div id="preview-content" style="line-height: 1.8; font-family: serif; max-width: 500px; margin: 0 auto;">
+            
+            <div id="preview-leave-template">
+                <p style="text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 40px;">휴가 신청서</p>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;">
+                    <tr><th style="border: 1px solid #333; padding: 5px; width: 30%; background-color: #f0f0f0;">소속</th><td style="border: 1px solid #333; padding: 5px;">{{ g.user['department'] }}</td></tr>
+                    <tr><th style="border: 1px solid #333; padding: 5px; background-color: #f0f0f0;">직급/성명</th><td style="border: 1px solid #333; padding: 5px;">{{ g.user['position'] }} / {{ g.user['name'] }}</td></tr>
+                </table>
+                <p style="font-size: 0.95em; margin-bottom: 30px;">
+                    상기 본인은 휴가 규정에 따라 아래와 같이 휴가를 신청합니다.
+                </p>
+                <h3 style="font-size: 1em; text-align: center; margin: 30px 0;">— 아 래 —</h3>
+                <div style="border: 1px solid #333; padding: 15px; margin-bottom: 30px;">
+                    <p style="font-weight: bold; margin-bottom: 10px;">1. 휴가 종류: <span id="preview-leave-type" style="color: #007bff; font-weight: normal;">[선택 필요]</span></p>
+                    <p style="font-weight: bold; margin-bottom: 10px;">2. 휴가 기간: <span id="preview-leave-duration" style="color: #007bff; font-weight: normal;">[날짜 입력 필요]</span></p>
+                    <p style="font-weight: bold;">3. 신청 사유: <span id="preview-leave-reason" style="color: #555; font-weight: normal; word-break: break-all;">-</span></p>
+                </div>
+            </div>
 
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;">
-                <tr><th style="border: 1px solid #333; padding: 5px; width: 30%; background-color: #f0f0f0;">소속</th><td id="preview-dept" style="border: 1px solid #333; padding: 5px;">{{ g.user['department'] }}</td></tr>
-                <tr><th style="border: 1px solid #333; padding: 5px; background-color: #f0f0f0;">직급/성명</th><td id="preview-name" style="border: 1px solid #333; padding: 5px;">{{ g.user['position'] }} / {{ g.user['name'] }}</td></tr>
-            </table>
-
-            <p style="font-size: 0.95em; margin-bottom: 30px;">
-                상기 본인은 휴가 규정에 따라 아래와 같이 휴가를 신청합니다.
-            </p>
-
-            <h3 style="font-size: 1em; text-align: center; margin: 30px 0;">— 아 래 —</h3>
-
-            <div style="border: 1px solid #333; padding: 15px; margin-bottom: 30px;">
-                <p style="font-weight: bold; margin-bottom: 10px;">1. 휴가 종류: <span id="preview-type" style="color: #007bff; font-weight: normal;">[선택 필요]</span></p>
-                <p style="font-weight: bold; margin-bottom: 10px;">2. 휴가 기간: <span id="preview-duration" style="color: #007bff; font-weight: normal;">[날짜 입력 필요]</span></p>
-                <p style="font-weight: bold;">3. 신청 사유: <span id="preview-reason" style="color: #555; font-weight: normal; word-break: break-all;">-</span></p>
+            <div id="preview-work-template" style="display: none;">
+                <p style="text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 40px;">근무 신청서 (외근/출장)</p>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.9em;">
+                    <tr><th style="border: 1px solid #333; padding: 5px; width: 30%; background-color: #f0f0f0;">소속</th><td style="border: 1px solid #333; padding: 5px;">{{ g.user['department'] }}</td></tr>
+                    <tr><th style="border: 1px solid #333; padding: 5px; background-color: #f0f0f0;">직급/성명</th><td style="border: 1px solid #333; padding: 5px;">{{ g.user['position'] }} / {{ g.user['name'] }}</td></tr>
+                </table>
+                <p style="font-size: 0.95em; margin-bottom: 30px;">
+                    상기 본인은 아래와 같이 외부 근무를 신청합니다.
+                </p>
+                <h3 style="font-size: 1em; text-align: center; margin: 30px 0;">— 아 래 —</h3>
+                <div style="border: 1px solid #333; padding: 15px; margin-bottom: 30px;">
+                    <p style="font-weight: bold; margin-bottom: 10px;">1. 근무 유형: <span id="preview-work-type" style="color: #007bff; font-weight: normal;">[선택 필요]</span></p>
+                    <p style="font-weight: bold; margin-bottom: 10px;">2. 근무일: <span id="preview-work-date" style="color: #007bff; font-weight: normal;">[날짜 입력 필요]</span></p>
+                    <p style="font-weight: bold; margin-bottom: 10px;">3. 장소(방문지): <span id="preview-work-destination" style="color: #555; font-weight: normal;">-</span></p>
+                    <p style="font-weight: bold;">4. 업무 사유: <span id="preview-work-reason" style="color: #555; font-weight: normal; word-break: break-all;">-</span></p>
+                </div>
             </div>
 
             <p style="text-align: right; margin-top: 50px; font-size: 0.9em;">
-                <span id="preview-date">{{ "now"|datetimeformat('%Y년 %m월 %d일') }}</span> 
+                <span id="preview-date">{{ today_display_date }}</span> 
                 <br><br>
                 신청인: <span style="font-weight: bold; text-decoration: none;">{{ g.user['name'] }}</span> (서명 또는 인) 
-                </p>
-            
+            </p>
             <p style="text-align: center; margin-top: 50px; font-weight: bold;">
                 주식회사 I-TEK 대표이사 김명지
             </p>
         </div>
     </div>
 </div>
+
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // 미리보기 업데이트 함수
-        window.updatePreview = function() {
-            const form = document.getElementById('vacation-form');
-            
-            // 1. 신청 유형 업데이트
-            const leaveType = form.elements['leave_type'].value;
-            document.getElementById('preview-type').textContent = leaveType || '[선택 필요]';
+    // 날짜 포맷팅 헬퍼 함수
+    const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        return `${parts[0]}. ${parts[1]}. ${parts[2]}.`;
+    };
 
-            // 2. 휴가 기간 업데이트
+    // 폼 섹션 토글 함수
+    window.showForm = function(formName) {
+        const leaveSection = document.getElementById('leave-form-section');
+        const workSection = document.getElementById('work-form-section');
+        const btnLeave = document.getElementById('btn-show-leave');
+        const btnWork = document.getElementById('btn-show-work');
+        const formTypeInput = document.getElementById('form_type');
+        
+        // ✅ [핵심 추가] 각 폼 섹션의 모든 입력 요소를 선택합니다.
+        const leaveInputs = leaveSection.querySelectorAll('select, input, textarea');
+        const workInputs = workSection.querySelectorAll('select, input, textarea');
+
+        if (formName === 'leave') {
+            // 1. 폼 보이기/숨기기
+            leaveSection.style.display = 'block';
+            workSection.style.display = 'none';
+            formTypeInput.value = 'vacation'; // 백엔드 전달 값
+            
+            // 2. ✅ [핵심 추가] 휴가 폼은 활성화, 근무 폼은 비활성화(disabled)
+            leaveInputs.forEach(el => el.disabled = false);
+            workInputs.forEach(el => el.disabled = true);
+            
+            // 3. 버튼 스타일링 (휴가=활성, 근무=비활성)
+            btnLeave.className = 'btn main-action-btn';
+            btnLeave.style.backgroundColor = '';
+            btnWork.className = 'btn sub-action-btn';
+            btnWork.style.backgroundColor = '#7f8c8d';
+
+        } else { // formName === 'work'
+            // 1. 폼 보이기/숨기기
+            leaveSection.style.display = 'none';
+            workSection.style.display = 'block';
+            formTypeInput.value = 'work'; // 백엔드 전달 값
+
+            // 2. ✅ [핵심 추가] 근무 폼은 활성화, 휴가 폼은 비활성화(disabled)
+            leaveInputs.forEach(el => el.disabled = true);
+            workInputs.forEach(el => el.disabled = false);
+
+            // 3. 버튼 스타일링 (근무=활성, 휴가=비활성)
+            btnWork.className = 'btn main-action-btn';
+            btnWork.style.backgroundColor = '';
+            btnLeave.className = 'btn sub-action-btn';
+            btnLeave.style.backgroundColor = '#7f8c8d';
+        }
+        
+        // ✅ [추가] 근무 유형(출장/외근)에 따른 종료일 비활성화 로직 재실행
+        handleWorkTypeChange(true); 
+        updatePreview(); // 미리보기 업데이트
+    }
+    
+    // 근무 유형 변경 시 날짜 입력창 제어 함수
+    window.handleWorkTypeChange = function(isFormToggle = false) {
+        const workType = document.getElementById('work_type').value;
+        const startDateInput = document.getElementById('work_start_date');
+        const endDateInput = document.getElementById('work_end_date');
+        
+        // 폼 전체가 비활성화 상태일 때는 이 함수를 실행하지 않음
+        if (document.getElementById('form_type').value !== 'work' && !isFormToggle) {
+            return;
+        }
+
+        if (workType === '외근' || workType === '재택근무') {
+            endDateInput.disabled = true;
+            endDateInput.style.backgroundColor = '#e9ecef'; 
+            if (startDateInput.value) {
+                endDateInput.value = startDateInput.value; 
+            }
+        } else if (workType === '출장') {
+            endDateInput.disabled = false;
+            endDateInput.style.backgroundColor = ''; 
+        } else {
+            endDateInput.disabled = true;
+            endDateInput.style.backgroundColor = '#e9ecef';
+            endDateInput.value = ''; 
+        }
+        
+        if (!isFormToggle) {
+            updatePreview();
+        }
+    }
+    
+    // 미리보기 업데이트 함수 (기존 코드와 동일)
+    window.updatePreview = function() {
+        const form = document.getElementById('request-form');
+        const formType = form.elements['form_type'].value;
+        
+        const previewTitle = document.getElementById('preview-title');
+        const leaveTemplate = document.getElementById('preview-leave-template');
+        const workTemplate = document.getElementById('preview-work-template');
+
+        if (formType === 'vacation') {
+            // 1. 휴가 폼 미리보기
+            previewTitle.textContent = '휴가 신청서 (미리보기)';
+            leaveTemplate.style.display = 'block';
+            workTemplate.style.display = 'none';
+
+            const leaveType = form.elements['leave_type'].value;
             const startDate = form.elements['start_date'].value;
             const endDate = form.elements['end_date'].value;
-            let durationText = '[날짜 입력 필요]';
-
-            if (startDate && endDate) {
-                // 날짜 포맷팅 (YYYY-MM-DD -> YYYY. MM. DD. 로 간단히 표시)
-                const format = (dateStr) => {
-                    if (!dateStr) return '';
-                    const parts = dateStr.split('-');
-                    return `${parts[0]}. ${parts[1]}. ${parts[2]}.`;
-                };
-                
-                // ✅ [핵심 수정] 휴가 종류(leaveType)를 기간 표시에서 완전히 제거
-                durationText = `${format(startDate)} ~ ${format(endDate)}`; 
-            }
-            document.getElementById('preview-duration').textContent = durationText;
-
-            // 3. 신청 사유 업데이트
             const reason = form.elements['reason'].value.trim();
-            document.getElementById('preview-reason').textContent = reason || '-';
-        };
 
-        // 페이지 로드 시 초기값 설정 및 이벤트 리스너 연결
-        const formElements = document.querySelectorAll('#vacation-form input, #vacation-form select, #vacation-form textarea');
+            document.getElementById('preview-leave-type').textContent = leaveType || '[선택 필요]';
+            document.getElementById('preview-leave-reason').textContent = reason || '-';
+
+            let durationText = '[날짜 입력 필요]';
+            if (startDate && endDate) {
+                durationText = `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
+            }
+            document.getElementById('preview-leave-duration').textContent = durationText;
+
+        } else {
+            // 2. 근무 폼 미리보기
+            previewTitle.textContent = '근무 신청서 (미리보기)';
+            leaveTemplate.style.display = 'none';
+            workTemplate.style.display = 'block';
+
+            const workType = form.elements['work_type'].value;
+            const workStartDate = form.elements['work_start_date'].value;
+            const workEndDate = form.elements['work_end_date'].value;
+            const destination = form.elements['destination'].value.trim();
+            const workReason = form.elements['work_reason'].value.trim();
+
+            document.getElementById('preview-work-type').textContent = workType || '[선택 필요]';
+            document.getElementById('preview-work-destination').textContent = destination || '-';
+            document.getElementById('preview-work-reason').textContent = workReason || '-';
+
+            let dateText = '[날짜 입력 필요]';
+            if (workType === '외근' || workType === '재택근무') {
+                if (workStartDate) {
+                    dateText = formatDate(workStartDate);
+                }
+            } else if (workType === '출장') {
+                if (workStartDate && workEndDate) {
+                    dateText = `${formatDate(workStartDate)} ~ ${formatDate(workEndDate)}`;
+                }
+            }
+            document.getElementById('preview-work-date').textContent = dateText;
+        }
+    };
+
+    // 페이지 로드 시 초기값 설정 및 이벤트 리스너 연결
+    document.addEventListener('DOMContentLoaded', function() {
+        const formElements = document.querySelectorAll('#request-form input, #request-form select, #request-form textarea');
         formElements.forEach(el => {
             el.addEventListener('input', updatePreview);
             el.addEventListener('change', updatePreview);
         });
-
-        // 초기 미리보기 로드
-        updatePreview();
+        
+        document.getElementById('work_type').addEventListener('change', handleWorkTypeChange);
+        document.getElementById('work_start_date').addEventListener('change', handleWorkTypeChange);
+        
+        // 초기 미리보기 로드 (기본은 휴가 폼)
+        showForm('leave'); // ✅ 이 함수가 이제 'work' 폼 필드를 비활성화(disabled)시킴
     });
 </script>
 {% endblock %}

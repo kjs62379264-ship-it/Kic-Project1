@@ -5,7 +5,7 @@
 
 {% block page_content %}
 
-<div class="card attendance-box-top" style="grid-column: 1 / 3; max-height: 700px;"> 
+<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1/2; max-height: 700px;"> 
     <div class="card-header employee-list-header">
         <div>근무 리스트 ({{ employees | length }}명)</div>
         <div class="header-actions">
@@ -109,7 +109,7 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-left">
+<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; height: 380px;">
     <div class="card-header">근무 현황 (총 {{ total_employees_count }}명)</div>
     <div class="card-body attendance-summary-circles">
         <div class="status-circle-item">
@@ -139,13 +139,11 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-right">
+<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; height: 380px;">
     <div class="card-header">근태 요청 현황</div>
     <div class="card-body" style="padding-bottom: 5px; 
-                                 display: flex; 
-                                 flex-direction: column; 
-                                 /* ✅ [핵심] 테이블 내용이 많아도 카드가 늘어나도록 flex-grow: 1 제거 */
-                                 ">
+                                    display: flex; 
+                                    flex-direction: column;">
         
         <div style="overflow-y: auto;">
             <table class="employee-table" style="font-size: 0.9em; width: 100%;">
@@ -159,60 +157,34 @@
                 </tr>
                 </thead>
                 <tbody>
-                {% for req in pending_requests %}
+                
+                {% for req in vacation_requests %}
                     <tr>
-                        <td>{{ req['name'] }} ({{ req['dept_code'] }})</td> 
-                        <td>{{ req['type'] }}</td>
-                        <td>{{ req['period'] }}</td>
-                        <td>{{ req['request_date'] }}</td>
-                        
+                        <td>{{ req['name'] }} ({{ req['department'] | default('-') }})</td> 
+                        <td>{{ req['request_type'] }}</td>
+                        <td>{{ req['start_date'] }} ~ {{ req['end_date'] }}</td>
+                        <td>{{ req['request_date'].split(' ')[0] }}</td>
                         <td style="text-align: center;">
                             {% if req['status'] == '승인' %}
                                 <span class="status-indicator approved">승인</span>
                             {% elif req['status'] == '반려' %}
                                 <span class="status-indicator rejected">반려</span>
+                            {% elif req['status'] == '대기' %}
+                                <span class="status-indicator pending">대기</span>
                             {% else %}
-                                <span class="status-indicator pending">미승인</span>
+                                <span class="status-indicator">{{ req['status'] }}</span>
                             {% endif %}
                         </td>
                     </tr>
+                
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #7f8c8d; height: 105px;">현재 처리할 휴가 요청이 없습니다.</td>
+                    </tr>
                 {% endfor %}
                 
-                {% set num_rows_to_add = 3 - pending_requests|length %}
-                {% if num_rows_to_add > 0 %}
-                    {% for i in range(num_rows_to_add) %}
-                        <tr>
-                            <td colspan="5" style="height: 35px; background-color: #fcfcfc; border: none;"></td>
-                        </tr>
-                    {% endfor %}
-                {% endif %}
-                
-                {% if total_requests == 0 and pending_requests|length == 0 %}
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: #7f8c8d; height: 105px;">현재 근태 요청 목록이 없습니다.</td>
-                    </tr>
-                {% endif %}
                 </tbody>
             </table>
         </div>
-
-        {% if total_pages > 1 %}
-        <div style="margin-top: 10px; text-align: center; padding: 5px 0; flex-shrink: 0;"> 
-            {% for p in range(1, total_pages + 1) %}
-                {% set page_url = url_for('attendance', pending_page=p) %}
-                <a href="{{ page_url }}" 
-                   style="display: inline-block; padding: 5px 10px; margin: 0 2px; border: 1px solid #ccc; border-radius: 4px; text-decoration: none; font-size: 0.9em;
-                          {% if p == current_pending_page %}background-color: #3498db; color: white; border-color: #3498db;{% else %}background-color: white; color: #333;{% endif %}">
-                    {{ p }}
-                </a>
-            {% endfor %}
-        </div>
-        {% endif %}
     </div>
-</div>
-
-<script>
-    // ... (JavaScript 로직 유지) ...
-</script>
-
-{% endblock %}
+</div> {% endblock %}

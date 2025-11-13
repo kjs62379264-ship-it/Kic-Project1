@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}직원 근태 조회{% endblock %}
+{% block page_body_class %}attendance-employee-list{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3; grid-row: 1 / 2;">
+    <div class="card-header">
+        {{ current_month }}월 직원 근태/복무 현황
+    </div>
+    
+    <div class="card-body" style="padding: 10px 20px; overflow-y: auto;">
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th>사번</th>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>직급</th>
+                    <th>잔여 연차 (일)</th>
+                    <th style="width: 10%; text-align: center;">지각 - 결근(회)</th> 
+                    <th style="width: 15%; text-align: center;">누적 초과근무 (시간)</th> 
+                    <th>상세 보기</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for emp in employee_stats %}
+                <tr>
+                    <td>{{ emp.id }}</td>
+                    <td>{{ emp.name }}</td>
+                    <td>{{ emp.department }}</td>
+                    <td>{{ emp.position }}</td>
+                    <td style="color: #3498db; font-weight: bold;">{{ emp.remaining_leave }}</td>
+                    
+                    <td style="text-align: center;">
+                        <span style="color: {% if emp.late_count > 0 %}#e74c3c{% else %}#555{% endif %};">{{ emp.late_count }}</span>
+                        -
+                        <span style="color: {% if emp.absence_count > 0 %}#e74c3c{% else %}#555{% endif %};">{{ emp.absence_count }}</span>
+                    </td>
+                    
+                    <td style="text-align: center;">{{ emp.overtime_hours }}</td>
+                    <td>
+                        <a href="{{ url_for('attendance_employee_detail', employee_id=emp.id) }}" class="detail-btn">조회</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #7f8c8d;">직원 데이터가 없습니다.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

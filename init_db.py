@@ -13,6 +13,7 @@ cursor.execute("DROP TABLE IF EXISTS email_domains")
 cursor.execute("DROP TABLE IF EXISTS attendance")
 cursor.execute("DROP TABLE IF EXISTS notices")
 cursor.execute("DROP TABLE IF EXISTS users")
+cursor.execute("DROP TABLE IF EXISTS vacation_requests")
 
 print("기존 테이블 모두 삭제 완료.")
 
@@ -56,6 +57,20 @@ cursor.execute("""
 CREATE TABLE notices (
     id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);""")
+cursor.execute("""
+CREATE TABLE vacation_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,                  -- 신청한 직원의 사번 (외래 키)
+    name TEXT NOT NULL,                     -- 직원의 이름 (조회 편의성)
+    department TEXT NOT NULL,               -- 직원의 부서 (조회 편의성)
+    request_type TEXT NOT NULL,             -- 연차, 오전 반차, 병가 등
+    start_date TEXT NOT NULL,               -- 휴가 시작일 (YYYY-MM-DD)
+    end_date TEXT NOT NULL,                 -- 휴가 종료일 (YYYY-MM-DD)
+    reason TEXT,                            -- 신청 사유
+    request_date DATETIME DEFAULT CURRENT_TIMESTAMP, -- 신청일시
+    status TEXT NOT NULL DEFAULT '대기',      -- 처리 현황 (대기, 승인, 반려)
+    FOREIGN KEY (user_id) REFERENCES employees (id)
 );""")
 print("모든 테이블 생성 완료.")
 

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}{{ target_user.name }} - 근태 상세 조회{% endblock %}
+{% block page_body_class %}attendance-employee-detail{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3; grid-row: 1 / 2;">
+    <div class="card-header" style="justify-content: flex-start; gap: 20px;">
+        <span style="font-size: 1.1em; font-weight: bold;">
+            {{ target_user.name }} ({{ target_user.department }} / {{ target_user.id }})
+        </span>
+        <span style="font-size: 1.1em; color: #555;">
+            복무 통계 요약
+        </span>
+        <a href="{{ url_for('attendance_employee') }}" class="sub-action-btn header-btn" style="margin-left: auto;">🔙 직원 목록</a>
+    </div>
+    
+    <div class="card-body">
+        <div class="statistics-container" style="display: flex; gap: 20px;">
+            
+            <div class="monthly-stats" style="flex: 1 1 50%; padding-right: 15px; border-right: 1px solid #eee;">
+                <h3 style="margin-top: 0; color: #3498db;">{{ employee_stats_summary.target_month }} 실적</h3>
+                <table class="employee-table stat-table">
+                    <tr><th>지각 일수</th><td>{{ employee_stats_summary.monthly.tardy_count }}회</td></tr>
+                    <tr><th>결근 일수</th><td style="color: #e74c3c;">{{ employee_stats_summary.monthly.absent_count }}일</td></tr>
+                    
+                    <tr>
+                        <th>외근 / 출장 일수</th>
+                        <td>{{ employee_stats_summary.monthly.offsite_days }}일 / {{ employee_stats_summary.monthly.business_trip_days }}일</td>
+                    </tr>
+                    
+                    <tr><th>휴가 사용</th><td style="font-weight: bold;">{{ employee_stats_summary.monthly.leave_days }}일</td></tr>
+                    <tr style="border-top: 2px solid #ddd;"><th>초과 근무 (시간)</th><td style="color: #2ecc71; font-weight: bold;">{{ employee_stats_summary.monthly.overtime_hours }}</td></tr>
+                    <tr><th>초과 근무 (일수)</th><td>{{ employee_stats_summary.monthly.overtime_days_count }}일</td></tr>
+                </table>
+            </div>
+
+            <div class="yearly-stats" style="flex: 1 1 50%;">
+                <h3 style="margin-top: 0; color: #7f8c8d;">{{ employee_stats_summary.target_year }}년 누적</h3>
+                 <table class="employee-table stat-table">
+                    <tr><th>지각 일수</th><td>{{ employee_stats_summary.yearly.tardy_count }}회</td></tr>
+                    <tr><th>결근 일수</th><td style="color: #e74c3c;">{{ employee_stats_summary.yearly.absent_count }}일</td></tr>
+                    
+                    <tr>
+                        <th>외근 / 출장 일수</th>
+                        <td>{{ employee_stats_summary.yearly.offsite_days }}일 / {{ employee_stats_summary.yearly.business_trip_days }}일</td>
+                    </tr>
+                    
+                    <tr><th>휴가 사용</th><td style="font-weight: bold;">{{ employee_stats_summary.yearly.leave_days }}일</td></tr>
+                    <tr style="border-top: 2px solid #ddd;"><th>초과 근무 (시간)</th><td style="color: #2ecc71; font-weight: bold;">{{ employee_stats_summary.yearly.overtime_hours }}</td></tr>
+                    <tr><th>초과 근무 (일수)</th><td>{{ employee_stats_summary.yearly.overtime_days_count }}일</td></tr>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="card" style="grid-column: 1 / 3; grid-row: 2 / 3; height: 380px;"> 
+    <div class="card-header">
+        <span style="flex-grow: 1;">🗓️ {{ current_month_name }} 근태 달력</span>
+        
+        <button class="sub-action-btn calendar-nav-btn" 
+                onclick="changeMonth({{ current_year }}, {{ current_month | int - 1 }})">
+            &lt;
+        </button>
+        <button class="sub-action-btn calendar-nav-btn" 
+                onclick="changeMonth({{ current_year }}, {{ current_month | int + 1 }})">
+            &gt;
+        </button>
+    </div>
+    
+    <div class="card-body" style="padding: 10px;">
+        <div id="attendance-calendar" style="width: 100%;">
+            {{ calendar_html | safe }} 
+        </div>
+    </div>
+</div>
+
+{% endblock %}
