@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}급여 명세서 관리{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header">월별 급여 계산기</div>
+    
+    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
+        <form method="GET" action="{{ url_for('payroll_manage') }}">
+            <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                
+                <span style="font-weight: bold;">계산 년/월:</span>
+                <input type="month" id="pay_month" name="pay_month" value="{{ pay_month }}" required style="padding: 8px;">
+
+                <span>이름:</span>
+                <input type="text" name="name" placeholder="이름으로 검색" style="width: 120px;" value="{{ request.args.get('name', '') }}">
+                
+                <span>부서:</span>
+                <select name="department">
+                    <option value="" {% if request.args.get('department', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>
+                        {{ dept['name'] }}
+                    </option>
+                    {% endfor %}
+                </select>
+                
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button type="submit" class="sub-action-btn header-btn">계산 및 조회</button>
+                    <a href="{{ url_for('payroll_manage') }}" class="sub-action-btn header-btn" style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
+                </div>
+            </div>
+        </form>
+    </div>
+<div style="padding: 10px 20px 0 20px; text-align: right; color: #555;">
+        (현재 DB에 설정된 총 공제율: <strong>{{ "%.4f%%"|format(total_deduction_rate_percent) }}</strong>)
+    </div>
+    <div class="card-body">
+        <div style="margin-bottom: 15px; text-align: right;">
+            {% if payroll_results %}
+                <strong style="font-size: 1.1em; color: #3498db;">
+                    "{{ pay_month }}"월 급여 계산 결과 (총 {{ payroll_results|length }}명)
+                </strong>
+            {% else %}
+                <strong style="font-size: 1.1em; color: #7f8c8d;">
+                    계산할 년/월을 선택하고 '계산 및 조회' 버튼을 누르세요.
+                </strong>
+            {% endif %}
+        </div>
+        
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th>사번</th>
+                    <th>이름</th>
+                    <th>직급</th>
+                    <th>기본급 (A)</th>
+                    <th>공제액 합계 (B)</th>
+                    <th>실지급액 (A - B)</th>
+                    <th>명세서</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in payroll_results %}
+                <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.position }}</td>
+                    <td>{{ "{:,.0f}원".format(row.base_salary) }}</td>
+                    <td>{{ "{:,.0f}원".format(row.deduction) }}</td>
+                    <td><strong>{{ "{:,.0f}원".format(row.net_pay) }}</strong></td>
+                    <td>
+                        <a href="#" class="btn detail-btn" style="font-size: 0.8em; padding: 3px 8px;">생성/보기</a>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center;">
+                        {% if pay_month %}
+                            계산 결과가 없습니다. (검색 조건 확인)
+                        {% else %}
+                            계산할 년/월을 선택하세요.
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
