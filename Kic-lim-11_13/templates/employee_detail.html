@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee['name'] }} - 직원 상세 정보{% endblock %}
+
+{% block page_content %}
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header employee-list-header">
+        <div>직원 상세 정보</div>
+        <div>
+            <!-- ✨ [핵심 수정] '재직' 상태일 때만 수정과 퇴사 처리 버튼이 모두 보이도록 그룹으로 묶습니다. -->
+            {% if employee['status'] == '재직' %}
+            {% if g.user.role == 'admin' or g.user.id == employee['id'] %}
+                <a href="{{ url_for('edit_employee', employee_id=employee['id']) }}" class="main-action-btn header-btn">✏️ 수정</a>
+                {% endif %}
+                {% if g.user.role == 'admin' %}
+                <form action="{{ url_for('process_departure', employee_id=employee['id']) }}" method="POST" style="display: inline;">
+                    <button type="submit" class="danger-action-btn header-btn" 
+                            onclick="return confirm('정말로 해당 직원을 퇴사 처리하시겠습니까?');">
+                        👋 퇴사 처리
+                    </button>
+                </form>
+                {% endif %}
+            {% endif %}
+
+            <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">🔙 목록으로 돌아가기</a>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <table class="employee-detail-table">
+            <tr>
+                <th>사번</th>
+                <td>{{ employee['id'] }}</td>
+            </tr>
+            <tr>
+                <th>이름</th>
+                <td>{{ employee['name'] }}</td>
+            </tr>
+            <tr>
+                <th>부서</th>
+                <td>{{ employee['department'] }}</td>
+            </tr>
+            <tr>
+                <th>직급</th>
+                <td>{{ employee['position'] }}</td>
+            </tr>
+            <tr>
+                <th>입사일</th>
+                <td>{{ employee['hire_date'] }}</td>
+            </tr>
+            <tr>
+                <th>연락처</th>
+                <td>{{ employee['phone_number'] }}</td>
+            </tr>
+            <tr>
+                <th>이메일</th>
+                <td>{{ employee['email'] }}</td>
+            </tr>
+            <tr>
+                <th>주소</th>
+                <td>{{ employee['address'] }}</td>
+            </tr>
+            <tr>
+                <th>성별</th>
+                <td>{{ employee['gender'] }}</td>
+            </tr>
+            <tr>
+                <th>재직 상태</th>
+                <td>
+                    {% if employee['status'] == '재직' %}
+                        <strong style="color: green;">{{ employee['status'] }}</strong>
+                    {% else %}
+                        <strong style="color: red;">{{ employee['status'] }}</strong>
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+

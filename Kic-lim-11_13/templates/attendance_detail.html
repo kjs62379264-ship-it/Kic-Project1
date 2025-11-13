@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ employee['name'] }} - 근태 상세 정보{% endblock %}
+
+{% block page_content %}
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header employee-list-header">
+        <div>{{ employee['name'] }} ({{ employee['id'] }}) 근태 정보</div>
+        <div>
+            <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn">🔙 근태 현황으로 돌아가기</a>
+        </div>
+    </div>
+
+    <div class="card-body">
+        
+        <table class="employee-detail-table"> 
+            <tr><th>이름</th><td>{{ employee['name'] }}</td></tr>
+            <tr><th>부서/직급</th><td>{{ employee['department'] }} / {{ employee['position'] }}</td></tr>
+            <tr><th>현재 상태</th>
+                <td>
+                    <strong style="color: 
+                        {% if today_status == '재실' %}
+                            green
+                        {% elif today_status == '휴가' %}
+                            #3498db
+                        {% elif today_status == '외근' %}
+                            #f39c12
+                        {% elif today_status == '출장' %}
+                            #1abc9c
+                        {% elif today_status == '부재' %}
+                            red
+                        {% else %}
+                            black
+                        {% endif %};">
+                        {{ today_status }}
+                    </strong>
+                </td>
+            </tr>
+        </table>
+        
+        <h4 style="margin-top: 30px;">최근 근태 기록 (5일)</h4>
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th>날짜</th>
+                    <th>출근 시간</th>
+                    <th>퇴근 시간</th>
+                    <th>근무 상태</th>
+                    <th>비고</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for record in records %}
+                <tr>
+                    <td>{{ record['date'] }}</td>
+                    <td>{{ record['clock_in'] if record['clock_in'] else '-' }}</td>
+                    <td>{{ record['clock_out'] if record['clock_out'] else '-' }}</td>
+                    <td>{{ record['status'] }}</td>
+                    <td>-</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

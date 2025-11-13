@@ -1,0 +1,227 @@
+{% extends "base_layout.html" %}
+{# ✨ [수정] base.html은 이제 base_layout.html을 상속받습니다. #}
+{# (base_layout.html은 아래 5단계에서 새로 만듭니다) #}
+
+{% block title %}{% block page_title %}대시보드{% endblock %} - 인사관리 시스템{% endblock %}
+
+{% block body_class %}{% block page_body_class %}{% endblock %}{% endblock %}
+
+{% block content %}
+<div class="main-container">
+    
+    {# g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
+    {% if g.user %}
+<aside class="sidebar">
+    <div class="profile-area">
+        <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user.profile_image or 'default.jpg')) }}');"></div>
+        <div class="user-info">
+            <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
+            <p class="user-dept">{{ g.user['department'] }}</p> 
+        </div>
+        
+        <div class="attendance-section">
+            {% if attendance_button_state == '퇴근' %}
+                <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
+                    <button type="submit" class="btn attendance-btn check-out">퇴근</button>
+                </form>
+            {% else %}
+                <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
+                    <button type="submit" class="btn attendance-btn check-in">출근</button>
+                </form>
+            {% endif %}
+            
+            </div> </div> <nav>
+            <ul>
+                <li><a href="{{ url_for('dashboard') }}">메인화면</a></li>
+<li class="has-submenu">
+    {# ⬅️ [수정] 메인 링크는 클릭 안 되도록 href 변경 #}
+    <a href="javascript:void(0);">인사 관리</a>
+
+    
+    <ul class="submenu-info">
+        {# ⬅️ [추가] '사원 명부' 메뉴 항목 추가 #}
+        <li><a href="{{ url_for('employee_list') }}">- 사원 명부</a></li>
+        {% if g.user.role == 'admin' %}
+        <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
+        
+        <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
+        <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
+        {% endif %}
+    </ul>
+    
+</li>
+                <li class="has-submenu">
+    <a href="javascript:void(0);">근태 관리</a>
+    <ul class="submenu-info">
+{% if g.user.role == 'admin' %}
+        <li><a href="{{ url_for('attendance') }}">- 전체 근태 현황</a></li>
+        {% endif %}
+        <li><a href="{{ url_for('my_attendance') }}">- 나의 근태 현황</a></li> 
+        
+        <li><a href="{{ url_for('vacation_request') }}">- 연차/휴가 신청</a></li>
+        
+    </ul>
+</li>
+                <li class="has-submenu">
+            <a href="javascript:void(0);">급여 관리</a>
+            <ul class="submenu-info">
+                <li><a href="{{ url_for('payroll') }}">- 급여 명세서 조회</a></li>
+                
+                {# ⬇️ [신규 추가] 관리자 전용 '관리' 메뉴 ⬇️ #}
+                {% if g.user.role == 'admin' %}
+                <li><a href="{{ url_for('payroll_manage') }}">- (관리) 명세서 관리</a></li>
+                <li><a href="{{ url_for('payroll_deductions') }}">- (관리) 공제 항목 설정</a></li>
+                {% endif %}
+            </ul>
+        </li>
+        
+        <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
+                
+                <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
+                <li><a href="{{ url_for('change_password') }}">비밀번호 변경</a></li>
+                <li><a href="{{ url_for('logout') }}" class="logout-link" style="color: #e74c3c;">로그아웃</a></li>
+            </ul>
+        </nav>
+    </aside>
+    {% endif %} {# (g.user 로그인 체크 끝) #}
+    
+
+<div style="flex-grow: 1; display: flex; flex-direction: column;">
+    
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        
+        {# [수정] 플래시 메시지 블록을 <main> (grid) 밖으로 이동시킵니다. #}
+        {% if messages %}
+            {# grid-column 대신 margin-bottom을 주어 간격을 맞춥니다. #}
+            <div style="margin-bottom: 20px;"> 
+                {% for category, message in messages %}
+                    <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+    {# ✨ [핵심 수정] "content" 블록의 이름을 "page_content"로 변경합니다 #}
+    <main class="content-grid">
+    {% block page_content %}
+    {% endblock %}
+    
+    {% endwith %}
+</main>
+</div></div>
+
+<script>
+    // 출퇴근 버튼 AJAX 처리 및 페이지 이동 로직
+    document.addEventListener('DOMContentLoaded', function() {
+const menuItems = document.querySelectorAll('.sidebar .has-submenu');
+
+        menuItems.forEach(item => {
+            // 하위 메뉴가 있는 <a> 태그 (예: "인사 관리", "근태 관리")를 찾습니다.
+            const mainLink = item.querySelector('a');
+
+            if (mainLink) {
+                mainLink.addEventListener('click', function(e) {
+                    // 1. 'javascript:void(0);' 링크의 기본 동작 방지
+                    e.preventDefault(); 
+                    
+                    // 2. 현재 메뉴의 'submenu-open' 클래스를 토글(추가/제거)합니다.
+                    const wasOpen = item.classList.contains('submenu-open');
+                    
+                    // 3. (중요) 먼저 모든 메뉴를 닫습니다.
+                    menuItems.forEach(otherItem => {
+                        otherItem.classList.remove('submenu-open');
+                    });
+                    
+                    // 4. 이전에 닫혀 있었다면, 현재 메뉴만 다시 엽니다.
+                    if (!wasOpen) {
+                        item.classList.add('submenu-open');
+                    }
+                    // (이미 열려있었다면 3번 단계에서 닫힌 채로 둡니다)
+                });
+            }
+        });
+
+        const clockForm = document.querySelector('.attendance-section form');
+        const clockBtn = document.querySelector('.attendance-section .attendance-btn');
+        
+        // 폼 제출 이벤트 가로채기
+        if (clockForm) {
+            clockForm.addEventListener('submit', function(e) {
+                e.preventDefault(); // 페이지 새로고침 방지!
+                
+                // 버튼 상태를 '처리 중...'으로 변경
+                clockBtn.disabled = true;
+                clockBtn.textContent = '처리 중...';
+
+                fetch(clockForm.action, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest' // Flask에서 is_json 체크를 돕습니다.
+                    },
+                    body: JSON.stringify({}) // 빈 JSON 본문 전송
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // 1. 알림 메시지 표시 (Flash 메시지 대신 JS 알림 사용)
+                        alert(data.message); 
+                        
+                        // 2. 버튼 상태 업데이트
+                        clockBtn.textContent = data.new_button_state;
+                        clockBtn.className = 'btn attendance-btn ' + (data.new_button_state === '퇴근' ? 'check-out' : 'check-in');
+                        clockBtn.disabled = false;
+                        
+                        // 3. [핵심] '나의 근태 현황' 페이지가 열려있다면 새로고침하여 테이블 업데이트
+                        // Flask의 url_for('my_attendance')와 현재 경로를 비교
+                        const myAttendanceUrl = "{{ url_for('my_attendance') }}";
+                        const currentPath = window.location.pathname + window.location.search;
+
+                        if (currentPath.includes(myAttendanceUrl)) {
+                            // 현재 my_attendance 페이지에 있다면 테이블 업데이트를 위해 새로고침
+                            window.location.reload(); 
+                        }
+                        
+                    } else {
+                        // 실패 시 메시지 표시 및 버튼 상태 복구
+                        alert('기록 실패: ' + data.message);
+                        clockBtn.disabled = false;
+                        // 페이지가 새로고침되지 않았으므로 버튼 텍스트를 현재 상태로 다시 설정
+                        clockBtn.textContent = clockBtn.classList.contains('check-in') ? '출근' : '퇴근';
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch Error:', error);
+                    alert('서버 통신 중 오류가 발생했습니다.');
+                    clockBtn.disabled = false;
+                    clockBtn.textContent = clockBtn.classList.contains('check-in') ? '출근' : '퇴근';
+                });
+            });
+        }
+    });
+
+    // 기존 changeMonth 함수는 그대로 유지
+    function changeMonth(year, month) {
+        // 월이 1월 미만이면 년도를 줄이고 월을 12로 설정
+        if (month < 1) {
+            year -= 1;
+            month = 12;
+        }
+        // 월이 12월 초과면 년도를 늘리고 월을 1로 설정
+        if (month > 12) {
+            year += 1;
+            month = 1;
+        }
+        
+        // 현재 URL을 가져와서 year와 month 쿼리 파라미터를 업데이트합니다.
+        const url = new URL(window.location.href);
+        url.searchParams.set('year', year);
+        url.searchParams.set('month', month);
+        
+        // 페이지를 새 URL로 이동시킵니다.
+        window.location.href = url.toString();
+    }
+</script>
+
+{% endblock %}
