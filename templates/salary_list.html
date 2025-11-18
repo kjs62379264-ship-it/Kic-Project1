@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block page_content %}
+<div class="card" style="grid-column: 1 / -1;">
+    <div class="card-header">
+        <span>💰 {{ year }}년 {{ month }}월 급여 대장</span>
+        {% if not is_calculated %}
+        <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;">
+            <button type="submit" class="btn main-action-btn">⚡ 일괄 계산 및 대장 생성</button>
+        </form>
+        {% else %}
+        <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;" onsubmit="return confirm('이미 생성된 대장이 있습니다. 다시 계산하시겠습니까?');">
+            <button type="submit" class="btn sub-action-btn">🔄 재계산</button>
+        </form>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <table class="employee-table">
+            <thead>
+                <tr>
+                    <th>사번</th><th>이름</th><th>부서</th>
+                    <th>기본급</th><th>수당</th><th>공제총액</th>
+                    <th>실수령액</th><th>지급일</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for pay in payrolls %}
+                <tr>
+                    <td>{{ pay.employee_id }}</td>
+                    <td>{{ pay.name }}</td>
+                    <td>{{ pay.department }}</td>
+                    <td>{{ pay.total_base|comma }}</td>
+                    <td>{{ pay.total_allowance|comma }}</td>
+                    <td style="color: #e74c3c;">{{ pay.total_deduction|comma }}</td>
+                    <td style="color: #2ecc71; font-weight: bold;">{{ pay.net_salary|comma }}</td>
+                    <td>{{ pay.payment_date }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8" style="text-align:center; padding: 30px;">아직 생성된 급여 내역이 없습니다.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
