@@ -5,7 +5,7 @@
 
 {% block page_content %}
 
-<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1/2; max-height: 700px;"> 
+<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1/2; height: auto; min-height: 400px;"> 
     <div class="card-header employee-list-header">
         <div>근무 리스트 ({{ employees | length }}명)</div>
         <div class="header-actions">
@@ -109,7 +109,7 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; height: 380px;">
+<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; min-height: 300px;">
     <div class="card-header">근무 현황 (총 {{ total_employees_count }}명)</div>
     <div class="card-body attendance-summary-circles">
         <div class="status-circle-item">
@@ -139,7 +139,7 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; height: 380px;">
+<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; min-height: 300px;">
     <div class="card-header">근태 요청 현황</div>
     <div class="card-body" style="padding-bottom: 5px; 
                                     display: flex; 

@@ -135,7 +135,9 @@ body {
 
     height: 100%;
     overflow-y: auto;
-
+    
+    /* ✨ [추가] 스크롤 시 아래쪽 내용이 잘리지 않도록 여백 추가 */
+    padding-bottom: 80px; 
 }
 .card {
     background-color: #ffffff;
