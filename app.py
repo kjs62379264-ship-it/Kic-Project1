@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, g, abort, jsonify
+import csv
+import io
 import sqlite3
 from datetime import datetime, time, date, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -855,6 +857,70 @@ def salary_payroll():
     return render_template('salary_list.html', year=year, month=month, payrolls=existing_payroll, is_calculated=is_calculated)
 
 # ----------------------------------------------------
+# [추가] 급여 대장 엑셀(CSV) 다운로드
+# ----------------------------------------------------
+@app.route('/salary/download/excel')
+@admin_required
+def download_salary_excel():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
+    
+    # 급여 데이터 조회
+    cur.execute("""
+        SELECT p.*, e.name, e.department, e.position 
+        FROM salary_payments p
+        JOIN employees e ON p.employee_id = e.id
+        WHERE p.payment_year = ? AND p.payment_month = ?
+        ORDER BY e.id
+    """, (year, month))
+    rows = cur.fetchall()
+    conn.close()
+
+    # CSV 메모리 버퍼 생성
+    output = io.StringIO()
+    # 엑셀에서 한글 깨짐 방지를 위해 BOM(Byte Order Mark) 추가
+    output.write(u'\ufeff')
+    
+    writer = csv.writer(output)
+    
+    # 헤더 작성
+    headers = ['사번', '이름', '부서', '직급', '기본급', '수당', '공제총액', '실수령액', '지급일', 
+               '국민연금', '건강보험', '장기요양', '고용보험', '소득세', '지방소득세']
+    writer.writerow(headers)
+    
+    # 데이터 작성
+    for row in rows:
+        writer.writerow([
+            row['employee_id'], 
+            row['name'], 
+            row['department'], 
+            row['position'],
+            row['total_base'], 
+            row['total_allowance'], 
+            row['total_deduction'], 
+            row['net_salary'], 
+            row['payment_date'],
+            row['national_pension'],
+            row['health_insurance'],
+            row['care_insurance'],
+            row['employment_insurance'],
+            row['income_tax'],
+            row['local_tax']
+        ])
+        
+    # 파일 응답 생성
+    from flask import Response
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename=payroll_{year}_{month}.csv"}
+    )
+
+# ----------------------------------------------------
 # [추가] 급여 계약 정보 관리 (연봉/계좌 수정)
 # ----------------------------------------------------
 @app.route('/salary/contracts', methods=['GET', 'POST'])
@@ -990,6 +1056,39 @@ def my_salary():
     conn.close()
     
     return render_template('my_salary.html', payment=last_pay, history=history, account=account)
+
+# ----------------------------------------------------
+# [추가] 급여 명세서 인쇄 전용 팝업
+# ----------------------------------------------------
+@app.route('/salary/print/<int:payment_id>')
+@login_required
+def print_salary(payment_id):
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    
+    # 1. 급여 내역 조회 (본인 것인지 확인)
+    cur.execute("""
+        SELECT p.*, e.name, e.department, e.position, e.hire_date
+        FROM salary_payments p
+        JOIN employees e ON p.employee_id = e.id
+        WHERE p.id = ?
+    """, (payment_id,))
+    payment = cur.fetchone()
+    
+    # 권한 체크 (관리자이거나 본인의 명세서인 경우만)
+    if not payment or (g.user['role'] != 'admin' and payment['employee_id'] != g.user['id']):
+        flash("접근 권한이 없습니다.", "error")
+        conn.close()
+        return redirect(url_for('my_salary'))
+        
+    # 2. 계좌 정보 조회
+    cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (payment['employee_id'],))
+    account = cur.fetchone()
+    
+    conn.close()
+    
+    return render_template('print_salary.html', payment=payment, account=account)
 
 # ----------------------------------------------------
 # 6. 기타 설정 및 공지사항 라우트

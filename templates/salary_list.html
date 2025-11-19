@@ -3,15 +3,24 @@
 <div class="card" style="grid-column: 1 / -1;">
     <div class="card-header">
         <span>💰 {{ year }}년 {{ month }}월 급여 대장</span>
-        {% if not is_calculated %}
-        <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;">
-            <button type="submit" class="btn main-action-btn">⚡ 일괄 계산 및 대장 생성</button>
-        </form>
-        {% else %}
-        <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;" onsubmit="return confirm('이미 생성된 대장이 있습니다. 다시 계산하시겠습니까?');">
-            <button type="submit" class="btn sub-action-btn">🔄 재계산</button>
-        </form>
-        {% endif %}
+        
+        <div style="display: inline-block;">
+            {% if is_calculated %}
+            <a href="{{ url_for('download_salary_excel', year=year, month=month) }}" class="btn sub-action-btn" style="background-color: #27ae60; color: white; margin-right: 10px;">
+                📥 엑셀 다운로드
+            </a>
+            {% endif %}
+
+            {% if not is_calculated %}
+            <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn main-action-btn">⚡ 일괄 계산 및 대장 생성</button>
+            </form>
+            {% else %}
+            <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="display:inline;" onsubmit="return confirm('이미 생성된 대장이 있습니다. 다시 계산하시겠습니까?');">
+                <button type="submit" class="btn sub-action-btn">🔄 재계산</button>
+            </form>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body">
         <table class="employee-table">

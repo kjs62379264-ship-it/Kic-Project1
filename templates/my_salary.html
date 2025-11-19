@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 {% block page_content %}
 <div class="card" style="grid-column: 1 / 2;">
-    <div class="card-header">📄 이번 달 급여 명세서 ({{ payment.payment_month if payment else '-' }}월)</div>
+    <div class="card-header">
+        <span>📄 이번 달 급여 명세서 ({{ payment.payment_month if payment else '-' }}월)</span>
+        {% if payment %}
+        <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em; margin-left: auto;">
+            🖨️ 명세서 인쇄
+        </a>
+        {% endif %}
+    </div>
     <div class="card-body">
         {% if payment %}
         <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">

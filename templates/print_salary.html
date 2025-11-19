@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>급여명세서 인쇄</title>
+    <style>
+        body { font-family: "Malgun Gothic", sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        .title { font-size: 24px; font-weight: bold; }
+        .info-table, .calc-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px; }
+        .info-table th, .info-table td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        .info-table th { background-color: #f5f5f5; width: 15%; }
+        
+        .calc-table th { border-top: 2px solid #333; border-bottom: 1px solid #333; padding: 10px; background-color: #f9f9f9; }
+        .calc-table td { border-bottom: 1px solid #eee; padding: 10px; }
+        .amount { text-align: right; }
+        
+        .total-row { background-color: #f0f8ff; font-weight: bold; border-top: 2px solid #333; }
+        .total-row td { padding: 15px 10px; }
+        
+        .footer { margin-top: 50px; text-align: center; font-size: 14px; color: #555; }
+        
+        @media print {
+            .no-print { display: none; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+    <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none;">🖨️ 인쇄하기</button>
+    </div>
+
+    <div class="header">
+        <div class="title">{{ payment.payment_year }}년 {{ payment.payment_month }}월 급여명세서</div>
+        <p>지급일: {{ payment.payment_date }}</p>
+    </div>
+
+    <table class="info-table">
+        <tr>
+            <th>성명</th><td>{{ payment.name }}</td>
+            <th>사번</th><td>{{ payment.employee_id }}</td>
+        </tr>
+        <tr>
+            <th>소속</th><td>{{ payment.department }}</td>
+            <th>직급</th><td>{{ payment.position }}</td>
+        </tr>
+        <tr>
+            <th>지급계좌</th><td colspan="3">{{ account.bank_name if account else '-' }} {{ account.account_number if account else '-' }}</td>
+        </tr>
+    </table>
+
+    <table class="calc-table">
+        <thead>
+            <tr>
+                <th width="50%">지급 내역</th>
+                <th width="50%">공제 내역</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td style="vertical-align: top;">
+                    <table width="100%">
+                        <tr><td>기본급</td><td class="amount">{{ payment.total_base|comma }}</td></tr>
+                        <tr><td>수당 합계</td><td class="amount">{{ payment.total_allowance|comma }}</td></tr>
+                        </table>
+                </td>
+                <td style="vertical-align: top; border-left: 1px solid #ccc;">
+                    <table width="100%">
+                        <tr><td>국민연금</td><td class="amount">{{ payment.national_pension|comma }}</td></tr>
+                        <tr><td>건강보험</td><td class="amount">{{ payment.health_insurance|comma }}</td></tr>
+                        <tr><td>장기요양보험</td><td class="amount">{{ payment.care_insurance|comma }}</td></tr>
+                        <tr><td>고용보험</td><td class="amount">{{ payment.employment_insurance|comma }}</td></tr>
+                        <tr><td>소득세</td><td class="amount">{{ payment.income_tax|comma }}</td></tr>
+                        <tr><td>지방소득세</td><td class="amount">{{ payment.local_tax|comma }}</td></tr>
+                    </table>
+                </td>
+            </tr>
+            <tr class="total-row">
+                <td>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>지급 총액</span>
+                        <span>{{ (payment.total_base + payment.total_allowance)|comma }} 원</span>
+                    </div>
+                </td>
+                <td style="border-left: 1px solid #ccc;">
+                    <div style="display: flex; justify-content: space-between; color: #e74c3c;">
+                        <span>공제 총액</span>
+                        <span>- {{ payment.total_deduction|comma }} 원</span>
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div style="text-align: center; margin-top: 30px; border: 2px solid #2ecc71; padding: 20px; border-radius: 10px;">
+        <span style="font-size: 18px; color: #555;">실 수령액</span><br>
+        <strong style="font-size: 32px; color: #333;">{{ payment.net_salary|comma }} 원</strong>
+    </div>
+
+    <div class="footer">
+        <p>귀하의 노고에 깊이 감사드립니다.</p>
+        <h3>주식회사 I-TEK 대표이사</h3>
+    </div>
+</body>
+</html>
