@@ -138,24 +138,34 @@ def datetimeformat(value, format='%Y년 %m월 %d일 %H:%M'):
     if value == 'now': value = datetime.now()
     return value.strftime(format)
 
-# ✨ [신규] 4대보험 및 소득세 계산 함수 (핵심 로직)
-def calculate_deductions_logic(monthly_salary, non_taxable_amount=200000):
+# ✨ [수정] 요율(rates)을 매개변수로 받아서 계산하도록 변경
+def calculate_deductions_logic(monthly_salary, non_taxable_amount=200000, rates=None):
+    
+    # rates가 없으면 기본값 사용 (안전장치)
+    if not rates:
+        rates = {'pension': 4.5, 'health': 3.545, 'care': 12.95, 'employment': 0.9}
+
     taxable_income = monthly_salary - non_taxable_amount
     if taxable_income < 0: taxable_income = 0
 
+    # 1. 국민연금 (요율 적용)
     pension_base = min(max(monthly_salary, 370000), 5900000)
-    national_pension = int(pension_base * 0.045)
+    national_pension = int(pension_base * (rates['pension'] / 100)) # ✨ 수정됨
     national_pension = (national_pension // 10) * 10 
 
-    health_insurance = int(monthly_salary * 0.03545)
+    # 2. 건강보험 (요율 적용)
+    health_insurance = int(monthly_salary * (rates['health'] / 100)) # ✨ 수정됨
     health_insurance = (health_insurance // 10) * 10
 
-    care_insurance = int(health_insurance * 0.1295)
+    # 3. 장기요양보험 (요율 적용)
+    care_insurance = int(health_insurance * (rates['care'] / 100)) # ✨ 수정됨
     care_insurance = (care_insurance // 10) * 10
 
-    employment_insurance = int(monthly_salary * 0.009)
+    # 4. 고용보험 (요율 적용)
+    employment_insurance = int(monthly_salary * (rates['employment'] / 100)) # ✨ 수정됨
     employment_insurance = (employment_insurance // 10) * 10
 
+    # (소득세 계산 로직은 기존과 동일 - 생략 가능하지만 전체 코드를 위해 유지)
     annual_income = taxable_income * 12
     if annual_income <= 5000000: deduction = annual_income * 0.7
     elif annual_income <= 15000000: deduction = 3500000 + (annual_income - 5000000) * 0.4
@@ -173,7 +183,6 @@ def calculate_deductions_logic(monthly_salary, non_taxable_amount=200000):
 
     income_tax = int(calculated_tax / 12) 
     income_tax = (income_tax // 10) * 10
-
     local_tax = int(income_tax * 0.1)
     local_tax = (local_tax // 10) * 10
 
@@ -1055,6 +1064,103 @@ def salary_contracts():
     
     return render_template('salary_contracts.html', contracts=contracts)
 
+# ----------------------------------------------------
+# [추가] 급여 공제 항목 관리 (기숙사비, 회비 등)
+# ----------------------------------------------------
+@app.route('/salary/deductions', methods=['GET'])
+@admin_required
+def salary_deductions():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 직원 목록과 각 직원의 공제 항목들을 가져옴
+    cursor.execute("""
+        SELECT e.id, e.name, e.department, e.position
+        FROM employees e
+        WHERE e.status = '재직' AND e.id != 'admin'
+        ORDER BY e.id
+    """)
+    employees = cursor.fetchall()
+    
+    # 직원별 공제 항목 리스트를 딕셔너리로 구성
+    deduction_map = {}
+    for emp in employees:
+        cursor.execute("SELECT * FROM fixed_deductions WHERE employee_id=?", (emp['id'],))
+        items = cursor.fetchall()
+        deduction_map[emp['id']] = items
+        
+    conn.close()
+    return render_template('salary_deductions.html', employees=employees, deduction_map=deduction_map)
+
+# ----------------------------------------------------
+# [추가] 급여 환경 설정 (4대보험 요율 관리)
+# ----------------------------------------------------
+@app.route('/salary/settings', methods=['GET', 'POST'])
+@admin_required
+def salary_settings():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    if request.method == 'POST':
+        try:
+            # 폼에서 입력받은 요율로 업데이트
+            cursor.execute("""
+                UPDATE payroll_rates 
+                SET national_pension_rate=?, health_insurance_rate=?, 
+                    care_insurance_rate=?, employment_insurance_rate=?
+                WHERE id=1
+            """, (
+                float(request.form['pension']),
+                float(request.form['health']),
+                float(request.form['care']),
+                float(request.form['employment'])
+            ))
+            conn.commit()
+            flash("4대보험 요율 설정이 저장되었습니다.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"오류 발생: {e}", "error")
+            
+    # 현재 설정된 요율 가져오기
+    cursor.execute("SELECT * FROM payroll_rates WHERE id=1")
+    rates = cursor.fetchone()
+    conn.close()
+    
+    return render_template('salary_settings.html', rates=rates)
+
+@app.route('/salary/deductions/add', methods=['POST'])
+@admin_required
+def add_deduction():
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    try:
+        emp_id = request.form['employee_id']
+        name = request.form['deduction_name']
+        amount = int(request.form['amount'].replace(',', ''))
+        
+        cursor.execute("INSERT INTO fixed_deductions (employee_id, deduction_name, amount) VALUES (?, ?, ?)", 
+                       (emp_id, name, amount))
+        conn.commit()
+        flash(f"{name} 공제 항목이 추가되었습니다.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"오류: {e}", "error")
+    finally:
+        conn.close()
+    return redirect(url_for('salary_deductions'))
+
+@app.route('/salary/deductions/delete/<int:deduction_id>', methods=['POST'])
+@admin_required
+def delete_deduction(deduction_id):
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM fixed_deductions WHERE id=?", (deduction_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('salary_deductions'))
+
 @app.route('/salary/calculate_all', methods=['POST'])
 @admin_required
 def calculate_all_salary():
@@ -1062,12 +1168,27 @@ def calculate_all_salary():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
+    # ... (기존 날짜 변수 설정 등) ...
     year = datetime.now().year
     month = datetime.now().month
-    payment_date = f"{year}-{month:02d}-25" 
-    
+    payment_date = f"{year}-{month:02d}-25"
+
     try:
+        # ✨ [추가] DB에서 현재 설정된 4대보험 요율 가져오기
+        cur.execute("SELECT * FROM payroll_rates WHERE id = 1")
+        rate_row = cur.fetchone()
+        
+        # 요율 딕셔너리 생성
+        current_rates = {
+            'pension': rate_row['national_pension_rate'],
+            'health': rate_row['health_insurance_rate'],
+            'care': rate_row['care_insurance_rate'],
+            'employment': rate_row['employment_insurance_rate']
+        }
+
+        # ... (기존 삭제 및 조회 로직) ...
         cur.execute("DELETE FROM salary_payments WHERE payment_year=? AND payment_month=?", (year, month))
+        
         cur.execute("""
             SELECT e.id, s.base_salary 
             FROM employees e
@@ -1078,6 +1199,7 @@ def calculate_all_salary():
         
         count = 0
         for emp in employees:
+            # ... (기존 수당 조회 로직) ...
             emp_id = emp['id']
             base_salary = emp['base_salary']
             cur.execute("SELECT SUM(amount) FROM fixed_allowances WHERE employee_id=?", (emp_id,))
@@ -1086,8 +1208,16 @@ def calculate_all_salary():
             non_taxable = cur.fetchone()[0] or 0
             
             total_monthly_income = base_salary + allowance_sum
-            deductions = calculate_deductions_logic(total_monthly_income, non_taxable)
-            net_salary = total_monthly_income - deductions['total_deduction']
+            
+            # ✨ [수정] 요율(current_rates)을 인자로 전달!
+            deductions = calculate_deductions_logic(total_monthly_income, non_taxable, rates=current_rates)
+            
+            # ... (이후 공제 합산 및 저장 로직은 기존과 동일) ...
+            # (아까 만든 추가 공제 합산 로직 유지)
+            cur.execute("SELECT SUM(amount) FROM fixed_deductions WHERE employee_id=?", (emp_id,))
+            extra_deduction_sum = cur.fetchone()[0] or 0
+            final_total_deduction = deductions['total_deduction'] + extra_deduction_sum
+            net_salary = total_monthly_income - final_total_deduction
             
             cur.execute("""
                 INSERT INTO salary_payments (
@@ -1098,7 +1228,7 @@ def calculate_all_salary():
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 emp_id, year, month, payment_date,
-                base_salary, allowance_sum, deductions['total_deduction'], net_salary,
+                base_salary, allowance_sum, final_total_deduction, net_salary,
                 deductions['national_pension'], deductions['health_insurance'], 
                 deductions['care_insurance'], deductions['employment_insurance'],
                 deductions['income_tax'], deductions['local_tax']
@@ -1106,7 +1236,7 @@ def calculate_all_salary():
             count += 1
             
         conn.commit()
-        flash(f"총 {count}명의 급여 정산이 완료되었습니다.", "success")
+        flash(f"총 {count}명의 급여가 최신 요율({current_rates['pension']}%, {current_rates['health']}%)로 계산되었습니다.", "success")
     except Exception as e:
         conn.rollback()
         flash(f"급여 계산 중 오류 발생: {e}", "error")

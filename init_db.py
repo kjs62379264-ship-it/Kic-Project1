@@ -153,6 +153,21 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
+    # (5) ✨ [신규] 급여/세금 요율 설정 테이블 (단 1개의 행만 사용)
+    cursor.execute("""
+    CREATE TABLE payroll_rates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        national_pension_rate REAL DEFAULT 4.5,    -- 국민연금 (4.5%)
+        health_insurance_rate REAL DEFAULT 3.545,  -- 건강보험 (3.545%)
+        care_insurance_rate REAL DEFAULT 12.95,    -- 장기요양 (건강보험의 12.95%)
+        employment_insurance_rate REAL DEFAULT 0.9 -- 고용보험 (0.9%)
+    );""")
+    
+    # 기본값 삽입 (2024/2025년 기준)
+    cursor.execute("INSERT INTO payroll_rates (id) VALUES (1)")
+    
+    print("급여 요율 테이블 생성 완료.")
+
     print("모든 테이블 생성 완료.")
 
     # ---------------------------------------------------------

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}급여 환경 설정{% endblock %}
+
+{% block page_content %}
+<div class="card" style="grid-column: 1 / -1; max-width: 600px; margin: 0 auto;">
+    <div class="card-header">
+        <span>⚙️ 4대보험 및 세금 요율 설정</span>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info" style="background-color: #e8f4f8; color: #2980b9; border: none; margin-bottom: 20px;">
+            ℹ️ 이 설정은 <strong>전체 직원의 급여 계산</strong>에 즉시 반영됩니다.<br>
+            (법정 요율이 변경될 경우에만 수정해 주세요.)
+        </div>
+
+        <form method="POST" action="{{ url_for('salary_settings') }}">
+            <table class="employee-table" style="margin-bottom: 20px;">
+                <tr>
+                    <th width="60%">항목</th>
+                    <th width="40%">요율 (%)</th>
+                </tr>
+                <tr>
+                    <td>국민연금 (본인부담금)</td>
+                    <td>
+                        <input type="number" step="0.01" name="pension" value="{{ rates.national_pension_rate }}" style="width: 80px; text-align: right;"> %
+                    </td>
+                </tr>
+                <tr>
+                    <td>건강보험 (본인부담금)</td>
+                    <td>
+                        <input type="number" step="0.001" name="health" value="{{ rates.health_insurance_rate }}" style="width: 80px; text-align: right;"> %
+                    </td>
+                </tr>
+                <tr>
+                    <td>장기요양보험 (건강보험료 대비)</td>
+                    <td>
+                        <input type="number" step="0.01" name="care" value="{{ rates.care_insurance_rate }}" style="width: 80px; text-align: right;"> %
+                    </td>
+                </tr>
+                <tr>
+                    <td>고용보험 (본인부담금)</td>
+                    <td>
+                        <input type="number" step="0.01" name="employment" value="{{ rates.employment_insurance_rate }}" style="width: 80px; text-align: right;"> %
+                    </td>
+                </tr>
+            </table>
+
+            <div style="text-align: center;">
+                <button type="submit" class="btn main-action-btn" style="width: 100%;">설정 저장하기</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
