@@ -58,7 +58,6 @@
                     </ul>
                 </li>
 
-                {# ✨ [수정됨] 급여 관리 메뉴 연결 #}
                 <li class="has-submenu">
                     <a href="#">급여 관리</a> 
                     <ul class="submenu-info">
@@ -67,7 +66,7 @@
                         {% if g.user.role == 'admin' %}
                         <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
                         <li><a href="{{ url_for('salary_payroll') }}">- 급여 대장 관리</a></li>
-                        <li><a href="{{ url_for('salary_contracts') }}">- 연봉/계좌 관리</a></li> 
+                        <li><a href="{{ url_for('salary_contracts') }}">- 연봉/계좌 관리</a></li>
                         {% endif %}
                     </ul>
                 </li>
@@ -83,7 +82,6 @@
     <main class="content-grid">
         
         {% with messages = get_flashed_messages(with_categories=true) %}
-        
         {% if messages %}
             <div style="grid-column: 1 / -1;">
                 {% for category, message in messages %}
@@ -103,17 +101,15 @@
 </div>
 
 <script>
-    // 출퇴근 버튼 AJAX 처리 및 페이지 이동 로직
+    // 1. 출퇴근 버튼 AJAX 처리 로직
     document.addEventListener('DOMContentLoaded', function() {
         const clockForm = document.querySelector('#clock-form');
         const clockBtn = document.querySelector('.attendance-section .attendance-btn');
         
-        // 폼 제출 이벤트 가로채기
         if (clockForm) {
             clockForm.addEventListener('submit', function(e) {
-                e.preventDefault(); // 페이지 새로고침 방지
+                e.preventDefault(); 
                 
-                // 버튼 상태를 '처리 중...'으로 변경
                 clockBtn.disabled = true;
                 clockBtn.textContent = '처리 중...';
 
@@ -133,12 +129,10 @@
                         clockBtn.className = 'btn attendance-btn ' + (data.new_button_state === '퇴근' ? 'check-out' : 'check-in');
                         clockBtn.disabled = false;
                         
-                        // '나의 근태 현황' 페이지라면 새로고침하여 테이블 업데이트
                         const myAttendanceUrl = "{{ url_for('my_attendance') }}";
                         if (window.location.pathname.includes(myAttendanceUrl)) {
                             window.location.reload(); 
                         }
-                        
                     } else {
                         alert('기록 실패: ' + data.message);
                         clockBtn.disabled = false;
@@ -154,7 +148,7 @@
         }
     });
 
-    // 달력 월 이동 함수 (전역)
+    // 2. 달력 월 이동 함수 (전역 사용)
     function changeMonth(year, month) {
         if (month < 1) { year -= 1; month = 12; }
         if (month > 12) { year += 1; month = 1; }
@@ -164,6 +158,28 @@
         url.searchParams.set('month', month);
         window.location.href = url.toString();
     }
+
+    // ✨ 3. [신규] 사이드바 메뉴 클릭 토글 기능
+    // (CSS에서 .sidebar .has-submenu:hover 스타일을 제거해야 효과가 있습니다)
+    document.addEventListener('DOMContentLoaded', function() {
+        const menuToggles = document.querySelectorAll('.sidebar .has-submenu > a');
+
+        menuToggles.forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                e.preventDefault(); // 페이지 이동 방지 (드롭다운 열기 위함)
+                const parentLi = this.parentElement;
+                
+                // (선택) 다른 메뉴 닫기: 원하시면 주석 해제하세요
+                /*
+                document.querySelectorAll('.sidebar .has-submenu').forEach(item => {
+                    if (item !== parentLi) item.classList.remove('open');
+                });
+                */
+
+                parentLi.classList.toggle('open'); // 'open' 클래스 토글
+            });
+        });
+    });
 </script>
 
 {% endblock %}

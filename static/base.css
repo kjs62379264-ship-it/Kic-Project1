@@ -192,8 +192,8 @@ body {
     padding-bottom: 0;
     margin-top: -5px;
 }
-.sidebar .has-submenu:hover > .submenu-info {
-    max-height: 200px;
+.sidebar .has-submenu.open > .submenu-info {
+    max-height: 500px; /* 메뉴가 많아질 수 있으니 넉넉하게 500px로 늘림 */
     padding-top: 5px;
     padding-bottom: 5px;
     margin-top: 0;
