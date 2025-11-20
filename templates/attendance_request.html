@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}근태 요청 처리{% endblock %}
+{% block page_body_class %}attendance-request-page{% endblock %}
+
+{% block page_content %}
+
+<div class="request-vertical-split-container" 
+     style="grid-column: 1 / 3; display: flex; flex-direction: column; gap: 20px; height: 100%;"> 
+
+    <div class="card" style="flex-grow: 1; display: flex; flex-direction: column;">
+        <div class="card-header">
+            <span style="color: #e67e22; font-weight: bold;">⏳ 승인 대기 목록</span>
+        </div>
+        
+        <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 10px 20px;">
+            
+            <div style="display: flex; justify-content: space-around; padding: 10px; border: 1px solid #eee; border-radius: 8px; background-color: #fcfcfc; margin-bottom: 20px;">
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-weight: bold; color: #555;">총 요청 건수</p>
+                    <h3 style="margin: 5px 0 0; color: #3498db;">{{ request_counts.TOTAL }}건</h3>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-weight: bold; color: #e67e22;">현재 대기 중</p>
+                    <h3 style="margin: 5px 0 0; color: #e67e22;">{{ request_counts['대기'] }}건</h3>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-weight: bold; color: #2ecc71;">총 승인 완료</p>
+                    <h3 style="margin: 5px 0 0; color: #2ecc71;">{{ request_counts['승인'] }}건</h3>
+                </div>
+                <div style="text-align: center;">
+                    <p style="margin: 0; font-weight: bold; color: #e74c3c;">총 반려 처리</p>
+                    <h3 style="margin: 5px 0 0; color: #e74c3c;">{{ request_counts['반려'] }}건</h3>
+                </div>
+            </div>
+            
+            <table class="employee-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">신청인</th>
+                        <th style="width: 10%;">부서</th>
+                        <th style="width: 10%;">유형</th>
+                        <th style="width: 25%;">기간</th>
+                        <th>사유</th>
+                        <th style="width: 15%; text-align: center;">처리</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for req in pending_requests %}
+                    <tr>
+                        <td>{{ req.name }}</td>
+                        <td>{{ req.department }}</td>
+                        <td style="font-weight: bold; color: #3498db;">{{ req.request_type }}</td>
+                        <td>{{ req.start_date }} ~ {{ req.end_date }}</td>
+                        <td style="text-align: left;">{{ req.reason }}</td>
+                        <td style="text-align: center;">
+                            <div style="display: flex; gap: 5px; justify-content: center;">
+                                <form action="{{ url_for('process_request', request_id=req.id, action='approve') }}" method="POST" onsubmit="return confirm('정말 승인하시겠습니까?');">
+                                    <button type="submit" class="btn main-action-btn" style="padding: 5px 10px; font-size: 0.8em;">승인</button>
+                                </form>
+                                <form action="{{ url_for('process_request', request_id=req.id, action='reject') }}" method="POST" onsubmit="return confirm('정말 반려하시겠습니까?');">
+                                    <button type="submit" class="btn danger-action-btn" style="padding: 5px 10px; font-size: 0.8em;">반려</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 30px 0;">
+                            현재 처리할 요청이 없습니다.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card" style="flex-grow: 1; display: flex; flex-direction: column;">
+        <div class="card-header">
+            <span style="color: #2c3e50;">📋 처리 완료 내역 (최근 10건)</span>
+        </div>
+        
+        <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 10px 20px;">
+            <table class="employee-table" style="background-color: #f9f9f9;">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">신청인</th>
+                        <th style="width: 10%;">부서</th>
+                        <th style="width: 10%;">유형</th>
+                        <th style="width: 25%;">기간</th>
+                        <th>사유</th>
+                        <th style="width: 10%;">신청일</th>
+                        <th style="width: 10%; text-align: center;">상태</th>
+                    </tr>
+                </thead>
+                <tbody style="color: #555;">
+                {% for req in processed_requests %}
+                    <tr>
+                        <td>{{ req.name }}</td>
+                        <td>{{ req.department }}</td>
+                        <td>{{ req.request_type }}</td>
+                        <td>{{ req.start_date }} ~ {{ req.end_date }}</td>
+                        <td style="text-align: left;">{{ req.reason }}</td>
+                        <td>{{ req.request_date.split(' ')[0] }}</td>
+                        <td style="text-align: center; font-weight: bold;">
+                            {% if req.status == '승인' %}
+                                <span style="color: #2ecc71;">승인됨</span>
+                            {% else %}
+                                <span style="color: #e74c3c;">반려됨</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 50px 0;">
+                            처리된 내역이 없습니다.
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

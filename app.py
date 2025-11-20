@@ -481,7 +481,7 @@ def attendance():
     cursor.execute("""
         SELECT name, department, request_type, start_date, end_date, request_date, status 
         FROM vacation_requests 
-        WHERE status IN ('대기', '승인') 
+        WHERE status IN ('대기', '승인', '반려') 
         ORDER BY request_date DESC
     """)
     vacation_requests = cursor.fetchall() # 이 변수를 템플릿으로 전달합니다.
@@ -1481,25 +1481,75 @@ def attendance_employee():
     cursor = conn.cursor()
 
     # ----------------------------------------------------
-    # ✅ 1. [수정] 현재 월 계산 (동적 제목용)
+    # ✅ 1. 필터 값 읽기 (수정: id_query, position_query 추가)
     # ----------------------------------------------------
-    current_month = datetime.now().month # 예: 11 (숫자)
+    id_query = request.args.get('id_query', '').strip()
+    name_query = request.args.get('name_query', '').strip()
+    department_query = request.args.get('department_query', '')
+    position_query = request.args.get('position_query', '')
+
+    # ✅ [신규 추가] 수치 필터 값 읽기 (숫자로 변환, 값이 없으면 0)
+    leave_filter = request.args.get('leave_filter', 0, type=int)
+    late_filter = request.args.get('late_filter', 0, type=int)
+    absent_filter = request.args.get('absent_filter', 0, type=int)
+    overtime_filter = request.args.get('overtime_filter', 0, type=int)
+
+    current_month = datetime.now().month
 
     # ----------------------------------------------------
-    # ✅ 2. [수정] 임시 데이터에 'absence_count' (결근 횟수) 추가
+    # ✅ 2. 부서 및 직급 목록 조회 (수정: positions 추가)
     # ----------------------------------------------------
-    # (향후 이 부분은 DB에서 JOIN과 COUNT/SUM으로 실제 계산해야 합니다)
-    employee_stats = [
+    departments = cursor.execute("SELECT name FROM departments ORDER BY name").fetchall()
+    positions = cursor.execute("SELECT name FROM positions ORDER BY name").fetchall()
+
+    # ----------------------------------------------------
+    # 3. 임시 데이터 (유지)
+    # ----------------------------------------------------
+    employee_stats_full = [
         {'id': '25HR0001', 'name': '홍길동', 'department': '인사팀', 'position': '과장', 'remaining_leave': 10.5, 'late_count': 1, 'absence_count': 0, 'overtime_hours': 5.5},
         {'id': '25DV0001', 'name': '김개발', 'department': '개발팀', 'position': '대리', 'remaining_leave': 15.0, 'late_count': 3, 'absence_count': 1, 'overtime_hours': 10.0},
-        {'id': '25DS0001', 'name': '이디자인', 'department': '디자인팀', 'position': '주임', 'remaining_leave': 12.0, 'late_count': 0, 'absence_count': 0, 'overtime_hours': 0},
+        {'id': '25DS0001', 'name': '이디자인', 'department': '디자인팀', 'position': '주임', 'remaining_leave': 4.0, 'late_count': 0, 'absence_count': 0, 'overtime_hours': 0},
+        {'id': '25MK0001', 'name': '박마케', 'department': '마케팅팀', 'position': '사원', 'remaining_leave': 8.0, 'late_count': 6, 'absence_count': 0, 'overtime_hours': 1.5},
     ]
 
     conn.close()
+    
+    # ----------------------------------------------------
+    # ✅ 4. 데이터 필터링 (수정: id_query, position_query 필터 로직 추가)
+    # ----------------------------------------------------
+    employee_stats_filtered = []
+    
+    for emp in employee_stats_full:
+        # 문자열 필터
+        if id_query and id_query.lower() not in emp['id'].lower():
+            continue
+        if name_query and name_query.lower() not in emp['name'].lower():
+            continue
+        if department_query and emp['department'] != department_query:
+            continue
+        if position_query and emp['position'] != position_query:
+            continue
+            
+        # ✅ [신규 추가] 수치 필터 (X 이상)
+        if leave_filter > 0 and emp['remaining_leave'] < leave_filter:
+            continue
+        if late_filter > 0 and emp['late_count'] < late_filter:
+            continue
+        if absent_filter > 0 and emp['absence_count'] < absent_filter:
+            continue
+        if overtime_filter > 0 and emp['overtime_hours'] < overtime_filter:
+            continue
+            
+        employee_stats_filtered.append(emp)
 
     return render_template('attendance_employee.html', 
-                           employee_stats=employee_stats,
-                           current_month=current_month) # ✅ 3. 현재 월 전달
+                           employee_stats=employee_stats_filtered, 
+                           current_month=current_month,
+                           departments=departments,
+                           positions=positions, 
+                           request=request 
+                           )
+                           
 # ----------------------------------------------------
 # 9. [신규] 관리자용 직원 근태 상세 조회
 # ----------------------------------------------------
@@ -1576,6 +1626,82 @@ def attendance_employee_detail(employee_id):
                             current_month=month,
                             current_month_name=start_date.strftime('%Y년 %m월')
                             )
+# ----------------------------------------------------
+# 10. [신규] 근태 요청 처리 페이지 (관리자용)
+# ----------------------------------------------------
+@app.route('/attendance_request')
+@login_required
+@admin_required
+def attendance_request():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 1. 대기 및 처리 완료 요청 조회 (기존 유지)
+    cursor.execute("""
+        SELECT id, name, department, request_type, start_date, end_date, reason, request_date, status 
+        FROM vacation_requests 
+        WHERE status = '대기' 
+        ORDER BY request_date DESC
+    """)
+    pending_requests = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT id, name, department, request_type, start_date, end_date, reason, request_date, status 
+        FROM vacation_requests 
+        WHERE status != '대기' 
+        ORDER BY request_date DESC
+        LIMIT 10
+    """)
+    processed_requests = cursor.fetchall()
+    
+    # ----------------------------------------------------
+    # ✅ [핵심 추가] 2. 전체 요청 통계 카운트 조회
+    # ----------------------------------------------------
+    total_requests_query = """SELECT status, COUNT(id) as count FROM vacation_requests GROUP BY status"""
+    counts_raw = cursor.execute(total_requests_query).fetchall()
+
+    request_counts = {'대기': 0, '승인': 0, '반려': 0, 'TOTAL': 0}
+    for row in counts_raw:
+        status = row['status']
+        count = row['count']
+        if status in request_counts:
+            request_counts[status] = count
+        request_counts['TOTAL'] += count
+    
+    conn.close()
+    
+    return render_template('attendance_request.html', 
+                           pending_requests=pending_requests,
+                           processed_requests=processed_requests,
+                           request_counts=request_counts) # ✅ 신규 변수 전달
+# ----------------------------------------------------
+# 11. [신규] 근태 요청 승인/반려 처리 로직
+# ----------------------------------------------------
+@app.route('/attendance/process/<int:request_id>/<action>', methods=['POST'])
+@login_required
+@admin_required
+def process_request(request_id, action):
+    if action not in ['approve', 'reject']:
+        flash("잘못된 요청입니다.", "error")
+        return redirect(url_for('attendance_request'))
+    
+    new_status = '승인' if action == 'approve' else '반려'
+    
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("UPDATE vacation_requests SET status = ? WHERE id = ?", (new_status, request_id))
+        conn.commit()
+        flash(f"요청이 {new_status} 처리되었습니다.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"처리 중 오류가 발생했습니다: {e}", "error")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('attendance_request'))
 # ----------------------------------------------------
 # 앱 실행
 # ----------------------------------------------------

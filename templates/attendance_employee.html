@@ -10,6 +10,82 @@
         {{ current_month }}월 직원 근태/복무 현황
     </div>
     
+    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
+        <form method="GET" action="{{ url_for('attendance_employee') }}">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; flex-grow: 1; padding-right: 20px;">
+                    
+                    <span>사번: 
+                        <input type="text" name="id_query" placeholder="사번으로 검색" style="width: 100px;" 
+                               value="{{ request.args.get('id_query', '') }}">
+                    </span>
+                    <span>이름: 
+                        <input type="text" name="name_query" placeholder="이름으로 검색" style="width: 100px;" 
+                               value="{{ request.args.get('name_query', '') }}">
+                    </span>
+                    <span>부서: 
+                        <select name="department_query">
+                            <option value="" {% if request.args.get('department_query', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept['name'] }}" {% if request.args.get('department_query') == dept['name'] %}selected{% endif %}>
+                                {{ dept['name'] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </span>
+                    <span>직급: 
+                        <select name="position_query">
+                            <option value="" {% if request.args.get('position_query', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            {% for pos in positions %}
+                            <option value="{{ pos['name'] }}" {% if request.args.get('position_query') == pos['name'] %}selected{% endif %}>
+                                {{ pos['name'] }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </span>
+
+                    <span>잔여 연차:
+                        <select name="leave_filter">
+                            <option value="" {% if request.args.get('leave_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            <option value="5" {% if request.args.get('leave_filter') == '5' %}selected{% endif %}>5일↑</option>
+                            <option value="10" {% if request.args.get('leave_filter') == '10' %}selected{% endif %}>10일↑</option>
+                        </select>
+                    </span>
+                    <span>지각:
+                        <select name="late_filter">
+                            <option value="" {% if request.args.get('late_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            <option value="1" {% if request.args.get('late_filter') == '1' %}selected{% endif %}>1회↑</option>
+                            <option value="3" {% if request.args.get('late_filter') == '3' %}selected{% endif %}>3회↑</option>
+                            <option value="5" {% if request.args.get('late_filter') == '5' %}selected{% endif %}>5회↑</option>
+                        </select>
+                    </span>
+                    <span>결근:
+                        <select name="absent_filter">
+                            <option value="" {% if request.args.get('absent_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            <option value="1" {% if request.args.get('absent_filter') == '1' %}selected{% endif %}>1회↑</option>
+                        </select>
+                    </span>
+                    <span>초과근무:
+                        <select name="overtime_filter">
+                            <option value="" {% if request.args.get('overtime_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                            <option value="1" {% if request.args.get('overtime_filter') == '1' %}selected{% endif %}>1시간↑</option>
+                            <option value="10" {% if request.args.get('overtime_filter') == '10' %}selected{% endif %}>10시간↑</option>
+                        </select>
+                    </span>
+                </div>
+
+                <div style="display: flex; gap: 10px; flex-shrink: 0;">
+                    <button type="submit" class="sub-action-btn header-btn" style="background-color: #3498db;">검색</button>
+                    <a href="{{ url_for('attendance_employee') }}" class="sub-action-btn header-btn" 
+                       style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
+                </div>
+
+            </div>
+        </form>
+    </div>
+    
     <div class="card-body" style="padding: 10px 20px; overflow-y: auto;">
         <table class="employee-table">
             <thead>
@@ -46,7 +122,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="8" style="text-align: center; color: #7f8c8d;">직원 데이터가 없습니다.</td>
+                    <td colspan="8" style="text-align: center; color: #7f8c8d;">검색된 직원이 없습니다.</td>
                 </tr>
             {% endfor %}
             </tbody>
