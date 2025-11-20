@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block page_content %}
+<div class="card" style="grid-column: 1 / 2;">
+    <div class="card-header">
+        <span>📄 이번 달 급여 명세서 ({{ payment.payment_month if payment else '-' }}월)</span>
+        {% if payment %}
+        <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em; margin-left: auto;">
+            🖨️ 명세서 인쇄
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if payment %}
+        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+            <div><strong>지급일:</strong> {{ payment.payment_date }}</div>
+            <div><strong>지급계좌:</strong> {{ account.bank_name }} {{ account.account_number }}</div>
+        </div>
+        <table class="employee-table" style="width: 100%;">
+            <tr><th>지급 항목</th><th>금액</th><th>공제 항목</th><th>금액</th></tr>
+            <tr>
+                <td>기본급</td><td style="text-align:right;">{{ payment.total_base|comma }}</td>
+                <td>국민연금</td><td style="text-align:right; color: #e74c3c;">{{ payment.national_pension|comma }}</td>
+            </tr>
+            <tr>
+                <td>수당 합계</td><td style="text-align:right;">{{ payment.total_allowance|comma }}</td>
+                <td>건강보험</td><td style="text-align:right; color: #e74c3c;">{{ payment.health_insurance|comma }}</td>
+            </tr>
+            <tr>
+                <td></td><td></td>
+                <td>장기요양</td><td style="text-align:right; color: #e74c3c;">{{ payment.care_insurance|comma }}</td>
+            </tr>
+            <tr>
+                <td></td><td></td>
+                <td>고용보험</td><td style="text-align:right; color: #e74c3c;">{{ payment.employment_insurance|comma }}</td>
+            </tr>
+            <tr>
+                <td></td><td></td>
+                <td>소득세(지방세)</td><td style="text-align:right; color: #e74c3c;">{{ payment.income_tax|comma }}({{ payment.local_tax|comma }})</td>
+            </tr>
+            <tr style="background-color: #f9f9f9; font-weight: bold;">
+                <td>지급 총액</td><td style="text-align:right;">{{ (payment.total_base + payment.total_allowance)|comma }}</td>
+                <td>공제 총액</td><td style="text-align:right; color: #e74c3c;">{{ payment.total_deduction|comma }}</td>
+            </tr>
+        </table>
+        <div style="text-align: center; margin-top: 20px; padding: 15px; background-color: #e8f8f5; border-radius: 8px;">
+            <h2 style="margin: 0; color: #27ae60;">실 수령액: {{ payment.net_salary|comma }} 원</h2>
+        </div>
+        {% else %}
+        <p style="text-align: center; padding: 30px;">이번 달 확정된 급여 내역이 없습니다.</p>
+        {% endif %}
+    </div>
+</div>
+<div class="card" style="grid-column: 2 / 3;">
+    <div class="card-header">📜 최근 급여 이력</div>
+    <div class="card-body" style="overflow-y: auto;">
+        <table class="employee-table">
+            <thead><tr><th>귀속월</th><th>지급총액</th><th>실수령액</th><th>상태</th></tr></thead>
+            <tbody>
+            {% for h in history %}
+                <tr>
+                    <td>{{ h.payment_year }}.{{ h.payment_month }}</td>
+                    <td>{{ (h.total_base + h.total_allowance)|comma }}</td>
+                    <td style="font-weight: bold;">{{ h.net_salary|comma }}</td>
+                    <td><span class="status-indicator approved">지급완료</span></td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
