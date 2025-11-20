@@ -391,7 +391,7 @@ def attendance():
         if emp['clock_out_time']: emp['check_out'] = emp['clock_out_time'][:5]
 
     # 3. 휴가 요청 (실제 DB)
-    cursor.execute("SELECT * FROM vacation_requests WHERE status IN ('대기','승인') ORDER BY request_date DESC")
+    cursor.execute("SELECT * FROM vacation_requests WHERE status IN ('대기','승인', '반려') ORDER BY request_date DESC")
     reqs = cursor.fetchall()
     
     conn.close()
@@ -617,7 +617,82 @@ def attendance_employee_detail(employee_id):
 
     return render_template('attendance_employee_detail.html', target_user=target_user, employee_stats_summary=employee_stats_summary, calendar_html=calendar_html, current_year=year, current_month=month, current_month_name=start_date.strftime('%Y년 %m월'))
 
+# ----------------------------------------------------
+# 10. [신규] 근태 요청 처리 페이지 (관리자용)
+# ----------------------------------------------------
+@app.route('/attendance_request')
+@login_required
+@admin_required
+def attendance_request():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 1. 대기 및 처리 완료 요청 조회 (기존 유지)
+    cursor.execute("""
+        SELECT id, name, department, request_type, start_date, end_date, reason, request_date, status 
+        FROM vacation_requests 
+        WHERE status = '대기' 
+        ORDER BY request_date DESC
+    """)
+    pending_requests = cursor.fetchall()
 
+    cursor.execute("""
+        SELECT id, name, department, request_type, start_date, end_date, reason, request_date, status 
+        FROM vacation_requests 
+        WHERE status != '대기' 
+        ORDER BY request_date DESC
+        LIMIT 10
+    """)
+    processed_requests = cursor.fetchall()
+    
+    # ----------------------------------------------------
+    # ✅ [핵심 추가] 2. 전체 요청 통계 카운트 조회
+    # ----------------------------------------------------
+    total_requests_query = """SELECT status, COUNT(id) as count FROM vacation_requests GROUP BY status"""
+    counts_raw = cursor.execute(total_requests_query).fetchall()
+
+    request_counts = {'대기': 0, '승인': 0, '반려': 0, 'TOTAL': 0}
+    for row in counts_raw:
+        status = row['status']
+        count = row['count']
+        if status in request_counts:
+            request_counts[status] = count
+        request_counts['TOTAL'] += count
+    
+    conn.close()
+    
+    return render_template('attendance_request.html', 
+                           pending_requests=pending_requests,
+                           processed_requests=processed_requests,
+                           request_counts=request_counts) # ✅ 신규 변수 전달
+# ----------------------------------------------------
+# 11. [신규] 근태 요청 승인/반려 처리 로직
+# ----------------------------------------------------
+@app.route('/attendance/process/<int:request_id>/<action>', methods=['POST'])
+@login_required
+@admin_required
+def process_request(request_id, action):
+    if action not in ['approve', 'reject']:
+        flash("잘못된 요청입니다.", "error")
+        return redirect(url_for('attendance_request'))
+    
+    new_status = '승인' if action == 'approve' else '반려'
+    
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("UPDATE vacation_requests SET status = ? WHERE id = ?", (new_status, request_id))
+        conn.commit()
+        flash(f"요청이 {new_status} 처리되었습니다.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"처리 중 오류가 발생했습니다: {e}", "error")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('attendance_request'))
 # ----------------------------------------------------
 # 4. 인사 관리 (HR) 라우트
 # ----------------------------------------------------

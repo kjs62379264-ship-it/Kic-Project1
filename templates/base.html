@@ -52,6 +52,7 @@
                         <li><a href="{{ url_for('vacation_request') }}">- 근무/휴가 신청</a></li>
                         {% if g.user.role == 'admin' %}
                         <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
+                        <li><a href="{{ url_for('attendance_request') }}">- 근태 요청 처리 (관리)</a></li>
                         <li><a href="{{ url_for('attendance_employee') }}">- 직원 근태 조회 (관리)</a></li>
                         <li><a href="{{ url_for('attendance') }}">- 실시간 현황 (관리)</a></li>
                         {% endif %}
