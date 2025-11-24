@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}마이 페이지{% endblock %}
+{% block page_body_class %}my-page{% endblock %}
+
+{% block page_content %}
+
+<div class="card" style="grid-column: 1 / 3; background-color: #fff; min-height: auto;">
+    <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 20px 20px;">
+        
+        <div style="display: flex; align-items: baseline; gap: 15px;">
+            <h1 style="margin: 0; font-size: 1.3em; color: #2c3e50; line-height: 1;">
+                {{ g.user['name'] }} {{ g.user['position'] }}
+            </h1>
+            <span style="color: #7f8c8d; font-size: 0.9em;">
+                | &nbsp; {{ g.user['department'] }} &nbsp; (사번: {{ g.user['id'] }})
+            </span>
+        </div>
+
+        <div>
+            <a href="{{ url_for('edit_employee', employee_id=g.user['id']) }}" class="btn sub-action-btn" style="padding: 4px 10px; font-size: 0.8em;">
+                ✏️ 정보 수정
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="grid-column: 1 / 2;">
+    <div class="card-header">👤 기본 정보</div>
+    <div class="card-body" style="padding: 10px 20px 20px 20px;">
+        <table class="employee-table" style="border: none; margin-top: 0;">
+            <tr>
+                <th style="width: 30%; background: none; border: none; border-bottom: 1px solid #eee;">입사일</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">
+                    {{ g.user['hire_date'] }} 
+                    <span style="color: #2980b9; font-weight: bold; margin-left: 5px;">
+                        {{ tenure_text }}
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">연락처</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ g.user['phone_number'] }}</td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">이메일</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ g.user['email'] }}</td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">주소</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ g.user['address'] }}</td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">성별</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ g.user['gender'] }}</td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none;">상태</th>
+                <td style="border: none;">
+                    <span style="color: green; font-weight: bold;">{{ g.user['status'] }}</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="card" style="grid-column: 2 / 3;">
+    <div class="card-header">💰 급여 및 계좌 정보</div>
+    <div class="card-body" style="padding: 10px 20px 20px 20px;">
+        <table class="employee-table" style="border: none; margin-top: 0;">
+            <tr>
+                <th style="width: 30%; background: none; border: none; border-bottom: 1px solid #eee;">급여 지급일</th>
+                <td style="border: none; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">
+                    매월 25일
+                </td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">지급 은행</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">
+                    {{ contract['bank_name'] if contract else '-' }}
+                </td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">계좌 번호</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">
+                    {{ contract['account_number'] if contract else '-' }}
+                </td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none; border-bottom: 1px solid #eee;">계약 연봉</th>
+                <td style="border: none; border-bottom: 1px solid #eee;">
+                    {% if contract %}
+                        <span class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer;">
+                            <span class="hidden-text">****** 원</span>
+                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">
+                                {{ contract['annual_salary']|comma }} 원
+                            </span>
+                        </span>
+                        <span style="font-size: 0.8em; color: #999;">(클릭)</span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <th style="background: none; border: none;">월 기본급</th>
+                <td style="border: none;">
+                    {% if contract %}
+                        <span class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer;">
+                            <span class="hidden-text">****** 원</span>
+                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">
+                                {{ contract['base_salary']|comma }} 원
+                            </span>
+                        </span>
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+        </table>
+        <div style="margin-top: 20px; text-align: right;">
+            <a href="{{ url_for('my_salary') }}" class="sub-action-btn" style="font-size: 0.9em;">
+                급여 명세서 전체 보기 >
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="grid-column: 1 / 3;">
+    <div class="card-header">📊 나의 근태 현황 요약</div>
+    
+    <div class="card-body" style="padding: 0; display: flex; flex-direction: column;">
+        
+        <div style="display: flex; flex: 1; border-bottom: 1px solid #eee;">
+            
+            <div style="flex: 1; padding: 25px; border-right: 1px solid #eee;">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #333; text-align: center; font-size: 1.1em;">📅 이번 달</h4>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.95em; color: #555;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>지각 / 결근</span> 
+                        <span style="font-size: 1.1em;">
+                            <strong style="color: #333;">{{ monthly_stats.late_count }}회</strong>
+                            <span style="color: #ccc; margin: 0 5px;">|</span>
+                            <strong style="color: #333;">{{ monthly_stats.absent_count }}회</strong>
+                        </span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>초과근무 (시간 / 일수)</span> 
+                        <span style="font-size: 1.1em;">
+                            <strong style="color: #333;">{{ monthly_stats.overtime_hours }}</strong>
+                            <span style="color: #ccc; margin: 0 5px;">|</span>
+                            <strong style="color: #333;">{{ monthly_stats.overtime_days }}일</strong>
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+
+            <div style="flex: 1; padding: 25px;">
+                <h4 style="margin-top: 0; margin-bottom: 10px; color: #7f8c8d; text-align: center; font-size: 1.1em;">📆 올해 누적</h4>
+                
+                <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.95em; color: #7f8c8d;">
+                    
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>지각 / 결근</span> 
+                        <span style="font-size: 1.1em;">
+                            <strong>{{ yearly_stats.late_count }}회</strong>
+                            <span style="color: #eee; margin: 0 5px;">|</span>
+                            <strong>{{ yearly_stats.absent_count }}회</strong>
+                        </span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>초과근무 (시간 / 일수)</span> 
+                        <span style="font-size: 1.1em;">
+                            <strong>{{ yearly_stats.overtime_hours }}</strong>
+                            <span style="color: #eee; margin: 0 5px;">|</span>
+                            <strong>{{ yearly_stats.overtime_days }}일</strong>
+                        </span>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 15px 20px; text-align: center; background-color: #fafafa;"> 
+            <div style="font-size: 1em; color: #555; margin-bottom: 10px;">잔여 연차</div> 
+            <div style="font-size: 2.5em; font-weight: bold; color: #2c3e50; line-height: 1;">
+                {{ remaining_leave }} <span style="font-size: 0.5em; color: #999; font-weight: normal;">일</span>
+            </div>
+            
+            <a href="{{ url_for('vacation_request') }}" style="display: inline-block; margin-top: 10px; font-size: 0.9em; color: #999; text-decoration: none; border: 1px solid #ddd; padding: 5px 15px; border-radius: 20px; background-color: white; transition: background-color 0.2s;">
+                휴가 신청하기 &gt;
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 연봉 정보 클릭 시 토글 기능
+    document.querySelectorAll('.security-blur').forEach(item => {
+        item.addEventListener('click', function() {
+            const hidden = this.querySelector('.hidden-text');
+            const real = this.querySelector('.real-text');
+            
+            if (real.style.display === 'none') {
+                real.style.display = 'inline';
+                hidden.style.display = 'none';
+            } else {
+                real.style.display = 'none';
+                hidden.style.display = 'inline';
+            }
+        });
+    });
+</script>
+
+{% endblock %}

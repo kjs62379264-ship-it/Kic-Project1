@@ -1430,5 +1430,72 @@ def edit_department():
         conn.close()
     return redirect(url_for('settings_management'))
 
+# ----------------------------------------------------
+# 13. [신규] 마이 페이지 (내 정보)
+# ----------------------------------------------------
+@app.route('/my_page')
+@login_required
+def my_page():
+    employee_id = g.user['id']
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 1. 급여 및 계좌 정보 조회
+    cursor.execute("SELECT * FROM salary_contracts WHERE employee_id = ?", (employee_id,))
+    contract = cursor.fetchone()
+    
+    # 2. [수정] 근태 통계 (이번 달 vs 올해 누적) - 임시 데이터 로직 포함
+    # 실제로는 DB에서 SUM/COUNT 쿼리를 복잡하게 짜야 하지만, 여기서는 구조만 잡습니다.
+    current_month_str = datetime.now().strftime('%Y-%m')
+    current_year_str = datetime.now().strftime('%Y')
+    
+    # (1) 이번 달 지각/결근
+    cursor.execute("""
+        SELECT 
+            COUNT(CASE WHEN attendance_status = '지각' THEN 1 END) as late_count,
+            COUNT(CASE WHEN attendance_status = '결근' THEN 1 END) as absent_count
+        FROM attendance 
+        WHERE employee_id = ? AND strftime('%Y-%m', record_date) = ?
+    """, (employee_id, current_month_str))
+    month_row = cursor.fetchone()
+    
+    monthly_stats = {
+        'late_count': month_row['late_count'],
+        'absent_count': month_row['absent_count'],
+        'overtime_hours': '0h 0m', # 임시
+        'overtime_days': 0        # 임시
+    }
+
+    # (2) 올해 누적 (임시 데이터)
+    yearly_stats = {
+        'late_count': month_row['late_count'] + 2, # 예시
+        'absent_count': month_row['absent_count'],
+        'overtime_hours': '12h 30m',
+        'overtime_days': 5
+    }
+    
+    # 3. 잔여 연차 (임시)
+    remaining_leave = 12.0 
+
+    # 4. 근속 기간 계산
+    tenure_text = ""
+    try:
+        hire_date = datetime.strptime(g.user['hire_date'], '%Y-%m-%d')
+        diff = relativedelta(datetime.now(), hire_date)
+        if diff.years > 0: tenure_text = f"({diff.years}년 {diff.months}개월차)"
+        elif diff.months == 0: tenure_text = "(신입)"
+        else: tenure_text = f"({diff.months}개월차)"
+    except ValueError:
+        tenure_text = ""
+
+    conn.close()
+    
+    return render_template('my_page.html', 
+                           contract=contract, 
+                           monthly_stats=monthly_stats, # ✅ 수정된 변수명
+                           yearly_stats=yearly_stats,   # ✅ 추가된 변수
+                           remaining_leave=remaining_leave,
+                           tenure_text=tenure_text)
 if __name__ == '__main__':
     app.run(debug=True)
