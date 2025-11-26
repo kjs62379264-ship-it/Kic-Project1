@@ -1,14 +1,16 @@
 import sqlite3
 from werkzeug.security import generate_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 
 def init_database():
     conn = sqlite3.connect('employees.db')
     cursor = conn.cursor()
 
     # ---------------------------------------------------------
-    # 1. 모든 테이블 삭제 (초기화) - 참조 관계 역순으로 삭제
+    # 1. 모든 테이블 삭제 (초기화) - 오류 방지를 위해 모두 포함
     # ---------------------------------------------------------
+    # [핵심] 오류가 발생했던 테이블을 포함하여 모든 테이블을 삭제합니다.
+    cursor.execute("DROP TABLE IF EXISTS payroll_rates") 
     cursor.execute("DROP TABLE IF EXISTS salary_payments")
     cursor.execute("DROP TABLE IF EXISTS fixed_deductions")
     cursor.execute("DROP TABLE IF EXISTS fixed_allowances")
@@ -21,6 +23,12 @@ def init_database():
     cursor.execute("DROP TABLE IF EXISTS email_domains")
     cursor.execute("DROP TABLE IF EXISTS positions")
     cursor.execute("DROP TABLE IF EXISTS departments")
+    
+    # 혹시 모를 이전 버전의 테이블들도 삭제
+    cursor.execute("DROP TABLE IF EXISTS salary")
+    cursor.execute("DROP TABLE IF EXISTS allowances")
+    cursor.execute("DROP TABLE IF EXISTS deductions")
+    cursor.execute("DROP TABLE IF EXISTS leave_requests")
 
     print("기존 테이블 모두 삭제 완료.")
 
@@ -91,7 +99,7 @@ def init_database():
     );""")
 
     # ---------------------------------------------------------
-    # 4. ✨ [신규] 급여 관리 전용 테이블 생성
+    # 4. 급여 관리 전용 테이블 생성
     # ---------------------------------------------------------
     
     # (1) 연봉 계약 정보 (기본급 관리)
@@ -107,18 +115,18 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (2) 고정 수당 항목 (식대, 직책수당 등 매월 고정 지급)
+    # (2) 고정 수당 항목
     cursor.execute("""
     CREATE TABLE fixed_allowances (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id TEXT NOT NULL,
         allowance_name TEXT NOT NULL,      -- 수당명
         amount INTEGER NOT NULL,           -- 금액
-        is_taxable BOOLEAN DEFAULT 1,      -- 과세 여부 (1: 과세, 0: 비과세)
+        is_taxable BOOLEAN DEFAULT 1,      -- 과세 여부
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (3) 고정 공제 항목 (일반적인 4대보험 외에 별도로 떼는 금액, 예: 사우회비, 가불금 상환)
+    # (3) 고정 공제 항목
     cursor.execute("""
     CREATE TABLE fixed_deductions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,7 +136,7 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (4) 급여 지급 기록 (매월 확정된 급여 대장 아카이브)
+    # (4) 급여 지급 기록
     cursor.execute("""
     CREATE TABLE salary_payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,34 +147,19 @@ def init_database():
         
         total_base INTEGER NOT NULL,       -- 기본급 지급액
         total_allowance INTEGER NOT NULL,  -- 수당 합계
-        total_deduction INTEGER NOT NULL,  -- 공제 합계 (세금 + 4대보험 + 기타)
+        total_deduction INTEGER NOT NULL,  -- 공제 합계
         net_salary INTEGER NOT NULL,       -- 실 수령액
         
-        national_pension INTEGER DEFAULT 0, -- 국민연금
-        health_insurance INTEGER DEFAULT 0, -- 건강보험
-        care_insurance INTEGER DEFAULT 0,   -- 장기요양보험
-        employment_insurance INTEGER DEFAULT 0, -- 고용보험
-        income_tax INTEGER DEFAULT 0,       -- 소득세
-        local_tax INTEGER DEFAULT 0,        -- 지방소득세
+        national_pension INTEGER DEFAULT 0, 
+        health_insurance INTEGER DEFAULT 0, 
+        care_insurance INTEGER DEFAULT 0,   
+        employment_insurance INTEGER DEFAULT 0, 
+        income_tax INTEGER DEFAULT 0,       
+        local_tax INTEGER DEFAULT 0,        
         
-        is_finalized BOOLEAN DEFAULT 0,     -- 마감 여부
+        is_finalized BOOLEAN DEFAULT 0,     
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
-
-    # (5) ✨ [신규] 급여/세금 요율 설정 테이블 (단 1개의 행만 사용)
-    cursor.execute("""
-    CREATE TABLE payroll_rates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        national_pension_rate REAL DEFAULT 4.5,    -- 국민연금 (4.5%)
-        health_insurance_rate REAL DEFAULT 3.545,  -- 건강보험 (3.545%)
-        care_insurance_rate REAL DEFAULT 12.95,    -- 장기요양 (건강보험의 12.95%)
-        employment_insurance_rate REAL DEFAULT 0.9 -- 고용보험 (0.9%)
-    );""")
-    
-    # 기본값 삽입 (2024/2025년 기준)
-    cursor.execute("INSERT INTO payroll_rates (id) VALUES (1)")
-    
-    print("급여 요율 테이블 생성 완료.")
 
     print("모든 테이블 생성 완료.")
 
@@ -189,7 +182,7 @@ def init_database():
 
     # (2) 로그인 정보
     users_data = [
-        ('25HR0001', '25HR0001', generate_password_hash('1234'), 'admin'), # 인사팀장급은 admin 권한 부여
+        ('25HR0001', '25HR0001', generate_password_hash('1234'), 'admin'),
         ('25DV0001', '25DV0001', generate_password_hash('1234'), 'user'),
         ('25DS0001', '25DS0001', generate_password_hash('1234'), 'user'),
         ('25MK0001', '25MK0001', generate_password_hash('1234'), 'user'),
@@ -203,22 +196,22 @@ def init_database():
     # (3) 공지사항
     cursor.execute("INSERT INTO notices (title, content) VALUES (?, ?)", ('환영합니다!', '인사관리 시스템이 오픈되었습니다.'))
 
-    # (4) ✨ [신규] 급여 계약 정보 샘플 (연봉/기본급)
+    # (4) 급여 계약 정보 샘플
     salary_contracts_data = [
-        ('25HR0001', 4166660, 50000000, '국민은행', '123-456-7890'), # 홍길동 (연봉 5000)
-        ('25DV0001', 3333330, 40000000, '신한은행', '110-222-333333'), # 김개발 (연봉 4000)
-        ('25DS0001', 2500000, 30000000, '카카오뱅크', '3333-01-1234567'), # 이디자인 (연봉 3000)
-        ('admin', 5000000, 60000000, '농협', '302-1234-5678-91'), # 관리자
+        ('25HR0001', 4166660, 50000000, '국민은행', '123-456-7890'),
+        ('25DV0001', 3333330, 40000000, '신한은행', '110-222-333333'),
+        ('25DS0001', 2500000, 30000000, '카카오뱅크', '3333-01-1234567'),
+        ('admin', 5000000, 60000000, '농협', '302-1234-5678-91'),
     ]
     cursor.executemany("""
         INSERT INTO salary_contracts (employee_id, base_salary, annual_salary, bank_name, account_number)
         VALUES (?, ?, ?, ?, ?)
     """, salary_contracts_data)
 
-    # (5) ✨ [신규] 고정 수당 정보 샘플
+    # (5) 고정 수당 정보 샘플
     allowance_data = [
-        ('25HR0001', '식대', 200000, 0),      # 비과세
-        ('25HR0001', '직책수당', 300000, 1),  # 과세
+        ('25HR0001', '식대', 200000, 0), 
+        ('25HR0001', '직책수당', 300000, 1),
         ('25DV0001', '식대', 200000, 0),
         ('25DS0001', '식대', 200000, 0),
     ]
@@ -226,6 +219,18 @@ def init_database():
         INSERT INTO fixed_allowances (employee_id, allowance_name, amount, is_taxable)
         VALUES (?, ?, ?, ?)
     """, allowance_data)
+
+    # (6) 휴가 요청 샘플 데이터
+    vacation_data = [
+        ('25DV0001', '김개발', '개발팀', '연차', '2025-11-20', '2025-11-20', '가족 행사 참석', '대기'),
+        ('25HR0001', '홍길동', '인사팀', '병가', '2025-12-05', '2025-12-06', '수술 후 회복', '승인'),
+        ('25DS0001', '이디자인', '디자인팀', '오후 반차', '2025-11-15', '2025-11-15', '병원 검진', '반려'),
+    ]
+    for uid, uname, udept, rtype, start, end, reason, status in vacation_data:
+        cursor.execute("""
+            INSERT INTO vacation_requests (user_id, name, department, request_type, start_date, end_date, reason, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (uid, uname, udept, rtype, start, end, reason, status))
 
     print("초기 데이터 삽입 완료.")
 

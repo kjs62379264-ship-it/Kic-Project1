@@ -1,20 +1,27 @@
-{# ✨ [수정] base_layout.html을 상속받도록 변경 #}
 {% extends "base_layout.html" %}
 
-{% block title %}로그인 - 인사관리 시스템{% endblock %}
+{% block title %}로그인 - (주)I-TEK{% endblock %}
 
-{# ✨ [수정] 로그인 전용 body 클래스 추가 #}
 {% block body_class %}login-page-body{% endblock %}
 
 {% block content %}
-<div class="login-card">
-    <h1>인사관리 시스템</h1>
+<div class="login-card" style="max-width: 420px;"> 
+    <div class="login-header" style="margin-bottom: 30px;">
+        <img src="{{ url_for('static', filename='profile_photos/logo.png') }}" 
+             alt="회사 로고" 
+             style="width: 120px; margin-bottom: 15px;">
+        <h2 style="margin: 0; color: #2c3e50; font-weight: 800;">(주)I-TEK</h2>
+        
+        <p style="margin: 5px 0 0; color: #7f8c8d; font-size: 1.1em;">
+            통합 인사관리 시스템
+        </p>
+    </div>
+
     <form method="post">
-        {# ✨ [수정] base.html과 동일한 플래시 메시지 블록으로 변경 #}
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}" style="text-align: left; margin-bottom: 20px;">
+                    <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}" style="text-align: left; margin-bottom: 20px; padding: 10px; font-size: 0.9em;">
                         {{ message }}
                     </div>
                 {% endfor %}
@@ -22,15 +29,28 @@
         {% endwith %}
         
         <div class="form-group">
-            {# ✨ [핵심 수정] '사번' -> '사용자 ID', for/id/name -> 'username' #}
-            <label for="username">사용자 ID</label>
-            <input type="text" id="username" name="username" required>
-        </div>
-        <div class="form-group">
-            <label for="password">비밀번호</label>
-            <input type="password" id="password" name="password" required>
-        </div>
-        <button type="submit" class="btn main-action-btn" style="width: 100%; padding: 15px; font-size: 1.1em;">로그인</button>
+    <label for="username" style="color: #555;">사용자 ID</label>
+    <input type="text" id="username" name="username" placeholder="사번을 입력하세요" required 
+           style="background-color: #f9f9f9;"
+           oninvalid="this.setCustomValidity('아이디를 입력해주세요.')"
+           oninput="this.setCustomValidity('')">
+</div>
+
+<div class="form-group">
+    <label for="password" style="color: #555;">비밀번호</label>
+    <input type="password" id="password" name="password" placeholder="비밀번호를 입력하세요" required
+           style="background-color: #f9f9f9;"
+           oninvalid="this.setCustomValidity('비밀번호를 입력해주세요.')"
+           oninput="this.setCustomValidity('')">
+</div>
+        
+        <button type="submit" class="btn main-action-btn" style="width: 100%; padding: 15px; font-size: 1.1em; margin-top: 10px; background-color: #2ecc71; border: none;">
+            로그인
+        </button>
     </form>
+
+    <div style="margin-top: 30px; font-size: 0.8em; color: #ccc;">
+        &copy; I-TEK Corp. All rights reserved.
+    </div>
 </div>
 {% endblock %}
