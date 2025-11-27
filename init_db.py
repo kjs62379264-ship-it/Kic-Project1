@@ -136,7 +136,7 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (4) 급여 지급 기록
+    # (4) 급여 지급 기록 테이블 수정
     cursor.execute("""
     CREATE TABLE salary_payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,8 +145,9 @@ def init_database():
         payment_month INTEGER NOT NULL,    -- 귀속 월
         payment_date DATE NOT NULL,        -- 지급일
         
-        total_base INTEGER NOT NULL,       -- 기본급 지급액
+        total_base INTEGER NOT NULL,       -- 기본급
         total_allowance INTEGER NOT NULL,  -- 수당 합계
+        overtime_pay INTEGER DEFAULT 0,    -- ✨ [추가] 초과(야근) 근무 수당
         total_deduction INTEGER NOT NULL,  -- 공제 합계
         net_salary INTEGER NOT NULL,       -- 실 수령액
         
@@ -160,6 +161,22 @@ def init_database():
         is_finalized BOOLEAN DEFAULT 0,     
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
+
+    # (5) [추가] 급여 요율 설정 테이블 (이 부분이 빠져 있었습니다!)
+    cursor.execute("""
+    CREATE TABLE payroll_rates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        national_pension_rate REAL DEFAULT 4.5,    -- 국민연금 (4.5%)
+        health_insurance_rate REAL DEFAULT 3.545,  -- 건강보험 (3.545%)
+        care_insurance_rate REAL DEFAULT 12.95,    -- 장기요양 (건강보험의 12.95%)
+        employment_insurance_rate REAL DEFAULT 0.9 -- 고용보험 (0.9%)
+    );""")
+    
+    # 기본 요율값 하나 넣어주기 (이게 없으면 조회할 때 또 에러납니다)
+    cursor.execute("""
+        INSERT INTO payroll_rates (id, national_pension_rate, health_insurance_rate, care_insurance_rate, employment_insurance_rate)
+        VALUES (1, 4.5, 3.545, 12.95, 0.9)
+    """)
 
     print("모든 테이블 생성 완료.")
 

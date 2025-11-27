@@ -121,7 +121,62 @@ def create_attendance_calendar(year, month, records):
     html += '</tbody></table>'
     return html
 
-# ✨ [신규] 금액 쉼표 포맷 필터
+# ✨ [신규] 초과 근무(야근) 수당 계산 함수
+def calculate_overtime_pay(employee_id, year, month, base_salary):
+    """
+    해당 월의 18:00 이후 근무 시간을 계산하여 야근 수당 산출
+    (통상임금 기준 1.5배 가산)
+    """
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    start_date = f"{year}-{month:02d}-01"
+    if month == 12:
+        next_month = f"{year+1}-01-01"
+    else:
+        next_month = f"{year}-{month+1:02d}-01"
+        
+    cursor.execute("""
+        SELECT clock_out_time FROM attendance 
+        WHERE employee_id = ? 
+          AND record_date >= ? AND record_date < ?
+          AND clock_out_time IS NOT NULL
+    """, (employee_id, start_date, next_month))
+    
+    records = cursor.fetchall()
+    conn.close()
+    
+    total_overtime_seconds = 0
+    
+    for row in records:
+        try:
+            out_time = datetime.strptime(row['clock_out_time'], '%H:%M:%S')
+        except ValueError:
+            try:
+                out_time = datetime.strptime(row['clock_out_time'], '%H:%M')
+            except:
+                continue
+                
+        # 18:00 (오후 6시) 기준 설정
+        standard_end = out_time.replace(hour=18, minute=0, second=0, microsecond=0)
+        
+        # 18시 이후 퇴근인 경우에만 계산
+        if out_time > standard_end:
+            diff = out_time - standard_end
+            total_overtime_seconds += diff.total_seconds()
+            
+    total_overtime_hours = total_overtime_seconds / 3600
+    
+    # 시급 계산 (통상임금 산정 기준 시간 209시간 가정)
+    hourly_rate = base_salary / 209
+    
+    # 야근 수당 = 시급 * 1.5 * 야근시간
+    overtime_pay = int(hourly_rate * 1.5 * total_overtime_hours)
+    
+    return overtime_pay, round(total_overtime_hours, 1)
+
+
 @app.template_filter('comma')
 def comma_filter(value):
     try:
@@ -138,34 +193,27 @@ def datetimeformat(value, format='%Y년 %m월 %d일 %H:%M'):
     if value == 'now': value = datetime.now()
     return value.strftime(format)
 
-# ✨ [수정] 요율(rates)을 매개변수로 받아서 계산하도록 변경
 def calculate_deductions_logic(monthly_salary, non_taxable_amount=200000, rates=None):
     
-    # rates가 없으면 기본값 사용 (안전장치)
     if not rates:
         rates = {'pension': 4.5, 'health': 3.545, 'care': 12.95, 'employment': 0.9}
 
     taxable_income = monthly_salary - non_taxable_amount
     if taxable_income < 0: taxable_income = 0
 
-    # 1. 국민연금 (요율 적용)
     pension_base = min(max(monthly_salary, 370000), 5900000)
-    national_pension = int(pension_base * (rates['pension'] / 100)) # ✨ 수정됨
+    national_pension = int(pension_base * (rates['pension'] / 100))
     national_pension = (national_pension // 10) * 10 
 
-    # 2. 건강보험 (요율 적용)
-    health_insurance = int(monthly_salary * (rates['health'] / 100)) # ✨ 수정됨
+    health_insurance = int(monthly_salary * (rates['health'] / 100))
     health_insurance = (health_insurance // 10) * 10
 
-    # 3. 장기요양보험 (요율 적용)
-    care_insurance = int(health_insurance * (rates['care'] / 100)) # ✨ 수정됨
+    care_insurance = int(health_insurance * (rates['care'] / 100))
     care_insurance = (care_insurance // 10) * 10
 
-    # 4. 고용보험 (요율 적용)
-    employment_insurance = int(monthly_salary * (rates['employment'] / 100)) # ✨ 수정됨
+    employment_insurance = int(monthly_salary * (rates['employment'] / 100))
     employment_insurance = (employment_insurance // 10) * 10
 
-    # (소득세 계산 로직은 기존과 동일 - 생략 가능하지만 전체 코드를 위해 유지)
     annual_income = taxable_income * 12
     if annual_income <= 5000000: deduction = annual_income * 0.7
     elif annual_income <= 15000000: deduction = 3500000 + (annual_income - 5000000) * 0.4
@@ -391,7 +439,7 @@ def attendance():
     for emp in employees:
         s = emp['status']
         if emp['clock_in_time'] and not emp['clock_out_time']: s = '재실'; emp['status'] = '재실'
-        elif s == '정상' or s == '지각': s = '재실' # 퇴근했거나 근무중
+        elif s == '정상' or s == '지각': s = '재실'
         
         if s in counts: counts[s] += 1
         else: counts['부재'] += 1
@@ -399,7 +447,7 @@ def attendance():
         if emp['clock_in_time']: emp['check_in'] = emp['clock_in_time'][:5]
         if emp['clock_out_time']: emp['check_out'] = emp['clock_out_time'][:5]
 
-    # 3. 휴가 요청 (실제 DB)
+    # 3. 휴가 요청
     cursor.execute("SELECT * FROM vacation_requests WHERE status IN ('대기','승인', '반려') ORDER BY request_date DESC")
     reqs = cursor.fetchall()
     
@@ -408,9 +456,6 @@ def attendance():
                            vacation_requests=reqs, total_employees_count=len(employees),
                            departments=[], positions=[])
 
-# ----------------------------------------------------
-# [복구] 개별 직원 근태 상세 조회 (최근 5일)
-# ----------------------------------------------------
 @app.route('/attendance/detail/<employee_id>')
 @login_required
 def attendance_detail(employee_id):
@@ -418,7 +463,6 @@ def attendance_detail(employee_id):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. 직원 정보 조회
     cursor.execute("SELECT * FROM employees WHERE id = ?", (employee_id,))
     employee = cursor.fetchone() 
     
@@ -427,7 +471,6 @@ def attendance_detail(employee_id):
         conn.close()
         return redirect(url_for('attendance'))
     
-    # 2. 최근 5일 근태 기록 조회
     cursor.execute("""
         SELECT * FROM attendance 
         WHERE employee_id = ? 
@@ -444,7 +487,6 @@ def attendance_detail(employee_id):
         r['status'] = r['attendance_status']
         records.append(r)
 
-    # 3. 오늘 상태 조회
     today = datetime.now().strftime('%Y-%m-%d')
     cursor.execute("SELECT attendance_status FROM attendance WHERE employee_id=? AND record_date=?", (employee_id, today))
     today_row = cursor.fetchone()
@@ -500,7 +542,7 @@ def my_attendance():
     
     return render_template('my_attendance.html', attendance_records=records, calendar_html=cal_html,
                            current_year=year, current_month=month, current_month_name=f"{year}년 {month}월",
-                           monthly_stats={'late_count': late_count, 'remaining_leave': 15}) # 연차는 임시
+                           monthly_stats={'late_count': late_count, 'remaining_leave': 15})
 
 @app.route('/vacation_request', methods=['GET', 'POST'])
 @login_required
@@ -536,9 +578,6 @@ def vacation_request():
         return redirect(url_for('my_attendance'))
     return render_template('vacation_request.html', today_display_date=datetime.now().strftime('%Y년 %m월 %d일'))
 
-# ----------------------------------------------------
-# [추가] 휴가/근무 요청 상태 변경 (승인/반려)
-# ----------------------------------------------------
 @app.route('/request/update/<int:req_id>/<action>', methods=['POST'])
 @admin_required
 def update_request_status(req_id, action):
@@ -553,10 +592,6 @@ def update_request_status(req_id, action):
         
     try:
         cursor.execute("UPDATE vacation_requests SET status = ? WHERE id = ?", (new_status, req_id))
-        
-        # (선택 사항) 만약 '승인'이고 날짜가 오늘이라면, attendance 테이블에도 '휴가' 등으로 기록을 남길 수 있습니다.
-        # 현재는 요청 상태만 변경합니다.
-        
         conn.commit()
         flash(f"요청이 '{new_status}' 처리되었습니다.", "success")
     except Exception as e:
@@ -565,7 +600,7 @@ def update_request_status(req_id, action):
     finally:
         conn.close()
         
-    return redirect(url_for('attendance')) # 관리자 대시보드로 이동
+    return redirect(url_for('attendance'))
 
 @app.route('/attendance_employee')
 @admin_required
@@ -611,7 +646,6 @@ def attendance_employee_detail(employee_id):
     month = request.args.get('month', datetime.now().month, type=int)
     start_date = date(year, month, 1)
 
-    # 통계 요약 (임시)
     employee_stats_summary = {
         'target_month': datetime.now().strftime('%Y년 %m월'),
         'target_year': datetime.now().year,
@@ -626,9 +660,6 @@ def attendance_employee_detail(employee_id):
 
     return render_template('attendance_employee_detail.html', target_user=target_user, employee_stats_summary=employee_stats_summary, calendar_html=calendar_html, current_year=year, current_month=month, current_month_name=start_date.strftime('%Y년 %m월'))
 
-# ----------------------------------------------------
-# 10. [신규] 근태 요청 처리 페이지 (관리자용)
-# ----------------------------------------------------
 @app.route('/attendance_request')
 @login_required
 @admin_required
@@ -637,7 +668,6 @@ def attendance_request():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. 대기 및 처리 완료 요청 조회 (기존 유지)
     cursor.execute("""
         SELECT id, name, department, request_type, start_date, end_date, reason, request_date, status 
         FROM vacation_requests 
@@ -655,9 +685,6 @@ def attendance_request():
     """)
     processed_requests = cursor.fetchall()
     
-    # ----------------------------------------------------
-    # ✅ [핵심 추가] 2. 전체 요청 통계 카운트 조회
-    # ----------------------------------------------------
     total_requests_query = """SELECT status, COUNT(id) as count FROM vacation_requests GROUP BY status"""
     counts_raw = cursor.execute(total_requests_query).fetchall()
 
@@ -674,10 +701,8 @@ def attendance_request():
     return render_template('attendance_request.html', 
                            pending_requests=pending_requests,
                            processed_requests=processed_requests,
-                           request_counts=request_counts) # ✅ 신규 변수 전달
-# ----------------------------------------------------
-# 11. [신규] 근태 요청 승인/반려 처리 로직
-# ----------------------------------------------------
+                           request_counts=request_counts)
+
 @app.route('/attendance/process/<int:request_id>/<action>', methods=['POST'])
 @login_required
 @admin_required
@@ -702,6 +727,7 @@ def process_request(request_id, action):
         conn.close()
         
     return redirect(url_for('attendance_request'))
+
 # ----------------------------------------------------
 # 4. 인사 관리 (HR) 라우트
 # ----------------------------------------------------
@@ -713,7 +739,6 @@ def hr_management():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    # 검색 조건 처리
     sql = "SELECT * FROM employees WHERE id != 'admin'"
     params = []
     
@@ -795,7 +820,6 @@ def add_employee():
     conn.close()
     return render_template('add_employee.html', departments=d, positions=p, email_domains=e)
 
-# ✨ [수정] 라우트 변수명 통일 (id -> employee_id)
 @app.route('/hr/employee/<employee_id>')
 @login_required
 def employee_detail(employee_id):
@@ -807,7 +831,6 @@ def employee_detail(employee_id):
     conn.close()
     return render_template('employee_detail.html', employee=emp)
 
-# ✨ [수정] 라우트 변수명 통일 (id -> employee_id)
 @app.route('/hr/edit/<employee_id>', methods=['GET', 'POST'])
 @login_required
 def edit_employee(employee_id):
@@ -832,7 +855,6 @@ def edit_employee(employee_id):
               f"{request.form['email_id']}@{request.form['email_domain']}",
               request.form['address'], img, employee_id))
         conn.commit()
-        # ✨ [수정] 리다이렉트 시 employee_id 사용
         return redirect(url_for('employee_detail', employee_id=employee_id))
 
     cur.execute("SELECT * FROM employees WHERE id=?", (employee_id,))
@@ -849,10 +871,6 @@ def edit_employee(employee_id):
     email = emp['email'].split('@') if emp['email'] else ['','']
     return render_template('edit_employee.html', employee=dict(emp), departments=depts, positions=pos, email_domains=doms,
                            phone_parts=phone, email_parts=email)
-
-# ----------------------------------------------------
-# [복구된 기능] 명부 인쇄 및 퇴사/재입사 처리
-# ----------------------------------------------------
 
 @app.route('/hr/print')
 @admin_required
@@ -899,7 +917,6 @@ def process_departure(employee_id):
         flash(f"오류 발생: {e}", "error")
     finally:
         conn.close()
-    # ✨ [수정] 리다이렉트 시 employee_id 사용
     return redirect(url_for('employee_detail', employee_id=employee_id))
 
 @app.route('/hr/rehire/<employee_id>', methods=['POST'])
@@ -911,11 +928,10 @@ def process_rehire(employee_id):
     conn.commit()
     conn.close()
     flash(f"직원({employee_id})이 재입사 처리되었습니다.", "success")
-    # ✨ [수정] 리다이렉트 시 employee_id 사용
     return redirect(url_for('employee_detail', employee_id=employee_id))
 
 # ----------------------------------------------------
-# 5. ✨ [신규] 급여 관리 (Payroll) 섹션
+# 5. 급여 관리 (Payroll) 섹션
 # ----------------------------------------------------
 
 @app.route('/salary/payroll', methods=['GET'])
@@ -925,8 +941,9 @@ def salary_payroll():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    year = datetime.now().year
-    month = datetime.now().month
+    # ✨ [수정] URL 파라미터로 년/월 받기 (없으면 현재 날짜)
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
     
     cur.execute("""
         SELECT p.*, e.name, e.department, e.position 
@@ -940,9 +957,6 @@ def salary_payroll():
     
     return render_template('salary_list.html', year=year, month=month, payrolls=existing_payroll, is_calculated=is_calculated)
 
-# ----------------------------------------------------
-# [추가] 급여 대장 엑셀(CSV) 다운로드
-# ----------------------------------------------------
 @app.route('/salary/download/excel')
 @admin_required
 def download_salary_excel():
@@ -953,7 +967,6 @@ def download_salary_excel():
     year = request.args.get('year', datetime.now().year, type=int)
     month = request.args.get('month', datetime.now().month, type=int)
     
-    # 급여 데이터 조회
     cur.execute("""
         SELECT p.*, e.name, e.department, e.position 
         FROM salary_payments p
@@ -964,19 +977,15 @@ def download_salary_excel():
     rows = cur.fetchall()
     conn.close()
 
-    # CSV 메모리 버퍼 생성
     output = io.StringIO()
-    # 엑셀에서 한글 깨짐 방지를 위해 BOM(Byte Order Mark) 추가
     output.write(u'\ufeff')
-    
     writer = csv.writer(output)
     
-    # 헤더 작성
-    headers = ['사번', '이름', '부서', '직급', '기본급', '수당', '공제총액', '실수령액', '지급일', 
+    # 헤더에 '야근수당' 추가
+    headers = ['사번', '이름', '부서', '직급', '기본급', '수당', '야근수당', '공제총액', '실수령액', '지급일', 
                '국민연금', '건강보험', '장기요양', '고용보험', '소득세', '지방소득세']
     writer.writerow(headers)
     
-    # 데이터 작성
     for row in rows:
         writer.writerow([
             row['employee_id'], 
@@ -985,6 +994,7 @@ def download_salary_excel():
             row['position'],
             row['total_base'], 
             row['total_allowance'], 
+            row['overtime_pay'], # ✨ 추가
             row['total_deduction'], 
             row['net_salary'], 
             row['payment_date'],
@@ -996,7 +1006,6 @@ def download_salary_excel():
             row['local_tax']
         ])
         
-    # 파일 응답 생성
     from flask import Response
     return Response(
         output.getvalue(),
@@ -1004,9 +1013,6 @@ def download_salary_excel():
         headers={"Content-disposition": f"attachment; filename=payroll_{year}_{month}.csv"}
     )
 
-# ----------------------------------------------------
-# [추가] 급여 계약 정보 관리 (연봉/계좌 수정)
-# ----------------------------------------------------
 @app.route('/salary/contracts', methods=['GET', 'POST'])
 @admin_required
 def salary_contracts():
@@ -1015,17 +1021,13 @@ def salary_contracts():
     cursor = conn.cursor()
 
     if request.method == 'POST':
-        # 수정 폼 제출 처리
         emp_id = request.form['employee_id']
-        annual_salary = int(request.form['annual_salary'].replace(',', '')) # 쉼표 제거
+        annual_salary = int(request.form['annual_salary'].replace(',', ''))
         bank_name = request.form['bank_name']
         account_number = request.form['account_number']
-        
-        # 기본급 자동 계산 (연봉 / 12)
         base_salary = annual_salary // 12
         
         try:
-            # 기존 계약이 있는지 확인
             cursor.execute("SELECT id FROM salary_contracts WHERE employee_id=?", (emp_id,))
             exists = cursor.fetchone()
             
@@ -1049,8 +1051,6 @@ def salary_contracts():
             
         return redirect(url_for('salary_contracts'))
 
-    # 조회 로직
-    # 직원 정보와 급여 계약 정보를 LEFT JOIN하여 가져옴 (계약 정보가 없는 직원도 표시)
     cursor.execute("""
         SELECT e.id, e.name, e.department, e.position, 
                s.annual_salary, s.base_salary, s.bank_name, s.account_number
@@ -1064,9 +1064,6 @@ def salary_contracts():
     
     return render_template('salary_contracts.html', contracts=contracts)
 
-# ----------------------------------------------------
-# [추가] 급여 공제 항목 관리 (기숙사비, 회비 등)
-# ----------------------------------------------------
 @app.route('/salary/deductions', methods=['GET'])
 @admin_required
 def salary_deductions():
@@ -1074,7 +1071,7 @@ def salary_deductions():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 직원 목록과 각 직원의 공제 항목들을 가져옴
+    # 1. 직원 목록 조회
     cursor.execute("""
         SELECT e.id, e.name, e.department, e.position
         FROM employees e
@@ -1083,19 +1080,81 @@ def salary_deductions():
     """)
     employees = cursor.fetchall()
     
-    # 직원별 공제 항목 리스트를 딕셔너리로 구성
+    # 2. 직원별 공제 항목 매핑
     deduction_map = {}
     for emp in employees:
         cursor.execute("SELECT * FROM fixed_deductions WHERE employee_id=?", (emp['id'],))
         items = cursor.fetchall()
         deduction_map[emp['id']] = items
+    
+    # ✨ [추가] 3. 부서 및 직급 목록 조회 (드롭다운용)
+    cursor.execute("SELECT name FROM departments ORDER BY name")
+    departments = [row['name'] for row in cursor.fetchall()]
+    
+    cursor.execute("SELECT name FROM positions ORDER BY id") # 혹은 순서가 있다면 정렬
+    positions = [row['name'] for row in cursor.fetchall()]
         
     conn.close()
-    return render_template('salary_deductions.html', employees=employees, deduction_map=deduction_map)
+    
+    # 템플릿에 departments와 positions를 함께 전달
+    return render_template('salary_deductions.html', 
+                           employees=employees, 
+                           deduction_map=deduction_map,
+                           departments=departments, 
+                           positions=positions)
 
-# ----------------------------------------------------
-# [추가] 급여 환경 설정 (4대보험 요율 관리)
-# ----------------------------------------------------
+# ✨ [신규] 그룹별 수당/공제 일괄 추가 기능
+@app.route('/salary/add_group_item', methods=['POST'])
+@admin_required
+def add_group_item():
+    target_type = request.form['target_type']  # 'all', 'department', 'position', 'individual'
+    target_value = request.form.get('target_value', '') 
+    item_type = request.form['item_type']      # 'allowance' or 'deduction'
+    name = request.form['item_name']
+    amount = int(request.form['amount'].replace(',', ''))
+    
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        sql = "SELECT id FROM employees WHERE status = '재직' AND id != 'admin'"
+        params = []
+        
+        if target_type == 'department':
+            sql += " AND department = ?"
+            params.append(target_value)
+        elif target_type == 'position':
+            sql += " AND position = ?"
+            params.append(target_value)
+        elif target_type == 'individual':
+            sql += " AND id = ?"
+            params.append(target_value)
+        
+        cursor.execute(sql, params)
+        targets = cursor.fetchall()
+        
+        count = 0
+        for emp in targets:
+            if item_type == 'allowance':
+                cursor.execute("INSERT INTO fixed_allowances (employee_id, allowance_name, amount) VALUES (?, ?, ?)",
+                               (emp['id'], name, amount))
+            else:
+                cursor.execute("INSERT INTO fixed_deductions (employee_id, deduction_name, amount) VALUES (?, ?, ?)",
+                               (emp['id'], name, amount))
+            count += 1
+            
+        conn.commit()
+        flash(f"총 {count}명에게 '{name}' 항목이 일괄 등록되었습니다.", "success")
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f"오류 발생: {e}", "error")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('salary_deductions'))
+
 @app.route('/salary/settings', methods=['GET', 'POST'])
 @admin_required
 def salary_settings():
@@ -1105,7 +1164,6 @@ def salary_settings():
     
     if request.method == 'POST':
         try:
-            # 폼에서 입력받은 요율로 업데이트
             cursor.execute("""
                 UPDATE payroll_rates 
                 SET national_pension_rate=?, health_insurance_rate=?, 
@@ -1123,7 +1181,6 @@ def salary_settings():
             conn.rollback()
             flash(f"오류 발생: {e}", "error")
             
-    # 현재 설정된 요율 가져오기
     cursor.execute("SELECT * FROM payroll_rates WHERE id=1")
     rates = cursor.fetchone()
     conn.close()
@@ -1168,17 +1225,14 @@ def calculate_all_salary():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    # ... (기존 날짜 변수 설정 등) ...
     year = datetime.now().year
     month = datetime.now().month
     payment_date = f"{year}-{month:02d}-25"
 
     try:
-        # ✨ [추가] DB에서 현재 설정된 4대보험 요율 가져오기
         cur.execute("SELECT * FROM payroll_rates WHERE id = 1")
         rate_row = cur.fetchone()
         
-        # 요율 딕셔너리 생성
         current_rates = {
             'pension': rate_row['national_pension_rate'],
             'health': rate_row['health_insurance_rate'],
@@ -1186,7 +1240,6 @@ def calculate_all_salary():
             'employment': rate_row['employment_insurance_rate']
         }
 
-        # ... (기존 삭제 및 조회 로직) ...
         cur.execute("DELETE FROM salary_payments WHERE payment_year=? AND payment_month=?", (year, month))
         
         cur.execute("""
@@ -1199,7 +1252,6 @@ def calculate_all_salary():
         
         count = 0
         for emp in employees:
-            # ... (기존 수당 조회 로직) ...
             emp_id = emp['id']
             base_salary = emp['base_salary']
             cur.execute("SELECT SUM(amount) FROM fixed_allowances WHERE employee_id=?", (emp_id,))
@@ -1209,11 +1261,14 @@ def calculate_all_salary():
             
             total_monthly_income = base_salary + allowance_sum
             
-            # ✨ [수정] 요율(current_rates)을 인자로 전달!
+            # ✨ [추가] 야근 수당 계산
+            overtime_amt, overtime_hours = calculate_overtime_pay(emp_id, year, month, base_salary)
+            
+            # 야근 수당은 과세 대상이므로 총 소득에 합산
+            total_monthly_income += overtime_amt
+            
             deductions = calculate_deductions_logic(total_monthly_income, non_taxable, rates=current_rates)
             
-            # ... (이후 공제 합산 및 저장 로직은 기존과 동일) ...
-            # (아까 만든 추가 공제 합산 로직 유지)
             cur.execute("SELECT SUM(amount) FROM fixed_deductions WHERE employee_id=?", (emp_id,))
             extra_deduction_sum = cur.fetchone()[0] or 0
             final_total_deduction = deductions['total_deduction'] + extra_deduction_sum
@@ -1222,13 +1277,13 @@ def calculate_all_salary():
             cur.execute("""
                 INSERT INTO salary_payments (
                     employee_id, payment_year, payment_month, payment_date,
-                    total_base, total_allowance, total_deduction, net_salary,
+                    total_base, total_allowance, overtime_pay, total_deduction, net_salary, 
                     national_pension, health_insurance, care_insurance, employment_insurance,
                     income_tax, local_tax
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 emp_id, year, month, payment_date,
-                base_salary, allowance_sum, final_total_deduction, net_salary,
+                base_salary, allowance_sum, overtime_amt, final_total_deduction, net_salary,
                 deductions['national_pension'], deductions['health_insurance'], 
                 deductions['care_insurance'], deductions['employment_insurance'],
                 deductions['income_tax'], deductions['local_tax']
@@ -1236,7 +1291,7 @@ def calculate_all_salary():
             count += 1
             
         conn.commit()
-        flash(f"총 {count}명의 급여가 최신 요율({current_rates['pension']}%, {current_rates['health']}%)로 계산되었습니다.", "success")
+        flash(f"총 {count}명의 급여가 최신 요율로 계산되었습니다. (야근수당 포함)", "success")
     except Exception as e:
         conn.rollback()
         flash(f"급여 계산 중 오류 발생: {e}", "error")
@@ -1262,9 +1317,6 @@ def my_salary():
     
     return render_template('my_salary.html', payment=last_pay, history=history, account=account)
 
-# ----------------------------------------------------
-# [추가] 급여 명세서 인쇄 전용 팝업
-# ----------------------------------------------------
 @app.route('/salary/print/<int:payment_id>')
 @login_required
 def print_salary(payment_id):
@@ -1272,7 +1324,6 @@ def print_salary(payment_id):
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    # 1. 급여 내역 조회 (본인 것인지 확인)
     cur.execute("""
         SELECT p.*, e.name, e.department, e.position, e.hire_date
         FROM salary_payments p
@@ -1281,13 +1332,11 @@ def print_salary(payment_id):
     """, (payment_id,))
     payment = cur.fetchone()
     
-    # 권한 체크 (관리자이거나 본인의 명세서인 경우만)
     if not payment or (g.user['role'] != 'admin' and payment['employee_id'] != g.user['id']):
         flash("접근 권한이 없습니다.", "error")
         conn.close()
         return redirect(url_for('my_salary'))
         
-    # 2. 계좌 정보 조회
     cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (payment['employee_id'],))
     account = cur.fetchone()
     
@@ -1430,9 +1479,6 @@ def edit_department():
         conn.close()
     return redirect(url_for('settings_management'))
 
-# ----------------------------------------------------
-# 13. [신규] 마이 페이지 (내 정보)
-# ----------------------------------------------------
 @app.route('/my_page')
 @login_required
 def my_page():
@@ -1441,16 +1487,11 @@ def my_page():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. 급여 및 계좌 정보 조회
     cursor.execute("SELECT * FROM salary_contracts WHERE employee_id = ?", (employee_id,))
     contract = cursor.fetchone()
     
-    # 2. [수정] 근태 통계 (이번 달 vs 올해 누적) - 임시 데이터 로직 포함
-    # 실제로는 DB에서 SUM/COUNT 쿼리를 복잡하게 짜야 하지만, 여기서는 구조만 잡습니다.
     current_month_str = datetime.now().strftime('%Y-%m')
-    current_year_str = datetime.now().strftime('%Y')
     
-    # (1) 이번 달 지각/결근
     cursor.execute("""
         SELECT 
             COUNT(CASE WHEN attendance_status = '지각' THEN 1 END) as late_count,
@@ -1463,22 +1504,19 @@ def my_page():
     monthly_stats = {
         'late_count': month_row['late_count'],
         'absent_count': month_row['absent_count'],
-        'overtime_hours': '0h 0m', # 임시
-        'overtime_days': 0        # 임시
+        'overtime_hours': '0h 0m',
+        'overtime_days': 0        
     }
 
-    # (2) 올해 누적 (임시 데이터)
     yearly_stats = {
-        'late_count': month_row['late_count'] + 2, # 예시
+        'late_count': month_row['late_count'] + 2, 
         'absent_count': month_row['absent_count'],
         'overtime_hours': '12h 30m',
         'overtime_days': 5
     }
     
-    # 3. 잔여 연차 (임시)
     remaining_leave = 12.0 
 
-    # 4. 근속 기간 계산
     tenure_text = ""
     try:
         hire_date = datetime.strptime(g.user['hire_date'], '%Y-%m-%d')
@@ -1493,9 +1531,10 @@ def my_page():
     
     return render_template('my_page.html', 
                            contract=contract, 
-                           monthly_stats=monthly_stats, # ✅ 수정된 변수명
-                           yearly_stats=yearly_stats,   # ✅ 추가된 변수
+                           monthly_stats=monthly_stats, 
+                           yearly_stats=yearly_stats,
                            remaining_leave=remaining_leave,
                            tenure_text=tenure_text)
+
 if __name__ == '__main__':
     app.run(debug=True)

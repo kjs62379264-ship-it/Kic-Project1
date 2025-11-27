@@ -1,8 +1,26 @@
 {% extends "base.html" %}
+
 {% block page_content %}
 <div class="card" style="grid-column: 1 / -1;">
-    <div class="card-header">
-        <span>💰 {{ year }}년 {{ month }}월 급여 대장</span>
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 1.1em; font-weight: bold;">💰 {{ year }}년 {{ month }}월 급여 대장</span>
+            
+            <form method="GET" action="{{ url_for('salary_payroll') }}" style="display: flex; gap: 5px; align-items: center;">
+                <select name="year" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                    {% for y in range(2024, 2027) %}
+                    <option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}년</option>
+                    {% endfor %}
+                </select>
+                <select name="month" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+                    {% for m in range(1, 13) %}
+                    <option value="{{ m }}" {% if month == m %}selected{% endif %}>{{ m }}월</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="sub-action-btn header-btn" style="padding: 5px 10px;">이동</button>
+            </form>
+        </div>
         
         <div style="display: inline-block;">
             {% if is_calculated %}
@@ -22,13 +40,19 @@
             {% endif %}
         </div>
     </div>
+
     <div class="card-body">
         <table class="employee-table">
             <thead>
                 <tr>
-                    <th>사번</th><th>이름</th><th>부서</th>
-                    <th>기본급</th><th>수당</th><th>공제총액</th>
-                    <th>실수령액</th><th>지급일</th>
+                    <th>사번</th>
+                    <th>이름</th>
+                    <th>부서</th>
+                    <th>기본급</th>
+                    <th>수당</th>
+                    <th style="background-color: #eaf2f8;">야근수당</th> <th>공제총액</th>
+                    <th>실수령액</th>
+                    <th>지급일</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,14 +61,19 @@
                     <td>{{ pay.employee_id }}</td>
                     <td>{{ pay.name }}</td>
                     <td>{{ pay.department }}</td>
-                    <td>{{ pay.total_base|comma }}</td>
-                    <td>{{ pay.total_allowance|comma }}</td>
-                    <td style="color: #e74c3c;">{{ pay.total_deduction|comma }}</td>
-                    <td style="color: #2ecc71; font-weight: bold;">{{ pay.net_salary|comma }}</td>
-                    <td>{{ pay.payment_date }}</td>
+                    <td style="text-align: right;">{{ pay.total_base|comma }}</td>
+                    <td style="text-align: right;">{{ pay.total_allowance|comma }}</td>
+                    
+                    <td style="text-align: right; color: #2980b9; background-color: #f4f8fb; font-weight: bold;">
+                        {{ pay.overtime_pay|comma }}
+                    </td>
+                    
+                    <td style="text-align: right; color: #e74c3c;">{{ pay.total_deduction|comma }}</td>
+                    <td style="text-align: right; color: #2ecc71; font-weight: bold;">{{ pay.net_salary|comma }}</td>
+                    <td style="text-align: center;">{{ pay.payment_date }}</td>
                 </tr>
             {% else %}
-                <tr><td colspan="8" style="text-align:center; padding: 30px;">아직 생성된 급여 내역이 없습니다.</td></tr>
+                <tr><td colspan="9" style="text-align:center; padding: 30px; color: #7f8c8d;">아직 생성된 급여 내역이 없습니다.</td></tr>
             {% endfor %}
             </tbody>
         </table>
