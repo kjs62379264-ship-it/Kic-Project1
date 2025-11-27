@@ -40,7 +40,7 @@ body {
     margin: 0; 
 }
 .sidebar nav {
-    margin-top: 20px;
+    margin-top: 5px;
     border-top: 1px solid #eee;
 }
 .sidebar a {
@@ -63,7 +63,7 @@ body {
 /* --- 3. 프로필 영역 스타일 --- */
 .profile-area {
     padding: 10px 0;
-    margin-bottom: 20px;
+    margin-bottom: 5px;
     text-align: center;
 }
 .profile-photo {

@@ -702,7 +702,57 @@ def attendance_request():
                            pending_requests=pending_requests,
                            processed_requests=processed_requests,
                            request_counts=request_counts)
-
+# ----------------------------------------------------
+# 13. [신규] 관리자 근태 기록 수정 (Admin Update)
+# ----------------------------------------------------
+@app.route('/attendance/update', methods=['POST'])
+@login_required
+@admin_required
+def update_attendance():
+    employee_id = request.form['employee_id']
+    record_date = request.form['record_date']
+    clock_in_time = request.form['clock_in_time']
+    clock_out_time = request.form['clock_out_time']
+    
+    # 빈 값 처리 (None으로 저장하거나, '-'이면 NULL 처리)
+    # time type input은 값이 없으면 ''(빈 문자열)을 보냅니다.
+    
+    # HH:MM 형식이므로 초(:00)를 붙여서 저장하는 것이 일반적입니다.
+    if clock_in_time: clock_in_time += ":00"
+    if clock_out_time: clock_out_time += ":00"
+    
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    
+    try:
+        # 해당 날짜의 기록이 있는지 확인
+        cursor.execute("SELECT id FROM attendance WHERE employee_id = ? AND record_date = ?", (employee_id, record_date))
+        exists = cursor.fetchone()
+        
+        if exists:
+            # 있으면 업데이트
+            cursor.execute("""
+                UPDATE attendance 
+                SET clock_in_time = ?, clock_out_time = ?, attendance_status = '수정됨'
+                WHERE id = ?
+            """, (clock_in_time, clock_out_time, exists[0]))
+        else:
+            # 없으면 새로 생성 (관리자가 강제 기록)
+            cursor.execute("""
+                INSERT INTO attendance (employee_id, record_date, clock_in_time, clock_out_time, attendance_status)
+                VALUES (?, ?, ?, ?, '수정됨')
+            """, (employee_id, record_date, clock_in_time, clock_out_time))
+            
+        conn.commit()
+        flash(f"{employee_id} 직원의 근태 기록이 수정되었습니다.", "success")
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f"수정 중 오류 발생: {e}", "error")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('attendance'))
 @app.route('/attendance/process/<int:request_id>/<action>', methods=['POST'])
 @login_required
 @admin_required

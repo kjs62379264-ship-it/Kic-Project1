@@ -5,12 +5,12 @@
 
 {% block page_content %}
 
-<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1/2; height: auto; min-height: 400px;"> 
+<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1 / 2; max-height: 700px;"> 
     <div class="card-header employee-list-header">
         <div>근무 리스트 ({{ employees | length }}명)</div>
         <div class="header-actions">
-            <input type="date" value="{{ today_date }}" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
-            <a href="#" class="sub-action-btn header-btn">⟳ 오늘</a>
+            <input type="date" value="{{ request.args.get('date', '') }}" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
+            <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn">⟳ 오늘</a>
         </div>
     </div>
     
@@ -100,7 +100,14 @@
                 <td>{{ emp['check_out'] if emp['check_out'] else '-' }}</td>
                 
                 <td>
-                    <a href="{{ url_for('attendance_detail', employee_id=emp['id']) }}" class="detail-btn">조회</a>
+                    <div style="display: flex; gap: 5px;">
+                        <a href="{{ url_for('attendance_detail', employee_id=emp['id']) }}" class="detail-btn">조회</a>
+                        
+                        <button type="button" class="sub-action-btn" style="padding: 5px 10px; font-size: 0.8em;"
+                                onclick="openEditAttendanceModal('{{ emp.id }}', '{{ emp.name }}', '{{ emp.check_in }}', '{{ emp.check_out }}', '')">
+                            수정
+                        </button>
+                    </div>
                 </td> 
             </tr>
             {% endfor %}
@@ -109,7 +116,7 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; min-height: 300px;">
+<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; height: 380px;">
     <div class="card-header">근무 현황 (총 {{ total_employees_count }}명)</div>
     <div class="card-body attendance-summary-circles">
         <div class="status-circle-item">
@@ -139,7 +146,7 @@
     </div>
 </div>
 
-<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; min-height: 300px;">
+<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; height: 380px;">
     <div class="card-header">근태 요청 현황</div>
     <div class="card-body" style="padding-bottom: 5px; 
                                     display: flex; 
@@ -169,15 +176,10 @@
                                 <span class="status-indicator approved">승인됨</span>
                             {% elif req['status'] == '반려' %}
                                 <span class="status-indicator rejected">반려됨</span>
+                            {% elif req['status'] == '대기' %}
+                                <span class="status-indicator pending">대기</span>
                             {% else %}
-                                <div style="display: flex; justify-content: center; gap: 5px;">
-                                    <form action="{{ url_for('update_request_status', req_id=req['id'], action='approve') }}" method="POST">
-                                        <button type="submit" class="btn" style="padding: 2px 8px; font-size: 0.8em; background-color: #2ecc71; color: white;" onclick="return confirm('승인하시겠습니까?');">승인</button>
-                                    </form>
-                                    <form action="{{ url_for('update_request_status', req_id=req['id'], action='reject') }}" method="POST">
-                                        <button type="submit" class="btn" style="padding: 2px 8px; font-size: 0.8em; background-color: #e74c3c; color: white;" onclick="return confirm('반려하시겠습니까?');">반려</button>
-                                    </form>
-                                </div>
+                                <span class="status-indicator">{{ req['status'] }}</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -193,4 +195,61 @@
         </div>
     </div>
 </div> 
+
+<div id="editAttendanceModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <span class="close" onclick="closeEditAttendanceModal()">&times;</span>
+        <h3>출퇴근 기록 수정</h3>
+        <p id="editModalEmployeeInfo" style="color: #555; margin-bottom: 15px;"></p>
+        
+        <form id="editAttendanceForm" method="POST" action="{{ url_for('update_attendance') }}">
+            <input type="hidden" name="employee_id" id="modal_employee_id">
+            <input type="hidden" name="record_date" id="modal_record_date">
+            
+            <div class="form-group">
+                <label for="modal_clock_in">출근 시간</label>
+                <input type="time" id="modal_clock_in" name="clock_in_time">
+            </div>
+            
+            <div class="form-group">
+                <label for="modal_clock_out">퇴근 시간</label>
+                <input type="time" id="modal_clock_out" name="clock_out_time">
+            </div>
+            
+            <div class="form-actions" style="margin-top: 20px;">
+                <button type="submit" class="btn main-action-btn" style="width: 100%;">수정 완료</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    // 모달 열기 함수
+    function openEditAttendanceModal(id, name, clockIn, clockOut, date) {
+        document.getElementById('modal_employee_id').value = id;
+        // 날짜 정보가 없으면 오늘 날짜를 사용 (실제로는 리스트 루프에서 값을 넘겨줘야 함)
+        document.getElementById('modal_record_date').value = date || new Date().toISOString().split('T')[0];
+        document.getElementById('editModalEmployeeInfo').innerText = `직원: ${name} (${id})`;
+        
+        // '-' 값이면 빈 값으로 설정
+        document.getElementById('modal_clock_in').value = (clockIn === '-' || !clockIn) ? '' : clockIn;
+        document.getElementById('modal_clock_out').value = (clockOut === '-' || !clockOut) ? '' : clockOut;
+        
+        document.getElementById('editAttendanceModal').style.display = "block";
+    }
+
+    // 모달 닫기 함수
+    function closeEditAttendanceModal() {
+        document.getElementById('editAttendanceModal').style.display = "none";
+    }
+
+    // 모달 바깥 클릭 시 닫기
+    window.onclick = function(event) {
+        const modal = document.getElementById('editAttendanceModal');
+        if (event.target == modal) {
+            closeEditAttendanceModal();
+        }
+    }
+</script>
+
 {% endblock %}
