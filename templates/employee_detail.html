@@ -7,11 +7,17 @@
     <div class="card-header employee-list-header">
         <div>직원 상세 정보</div>
         <div>
-            <!-- ✨ [핵심 수정] '재직' 상태일 때만 수정과 퇴사 처리 버튼이 모두 보이도록 그룹으로 묶습니다. -->
             {% if employee['status'] == '재직' %}
-            {% if g.user.role == 'admin' or g.user.id == employee['id'] %}
+                <a href="{{ url_for('print_certificate', employee_id=employee['id']) }}" target="_blank" class="sub-action-btn header-btn" style="background-color: #8e44ad; color: white;">
+                    📜 재직증명서 인쇄
+                </a>
+            {% endif %}
+
+            {% if employee['status'] == '재직' %}
+                {% if g.user.role == 'admin' or g.user.id == employee['id'] %}
                 <a href="{{ url_for('edit_employee', employee_id=employee['id']) }}" class="main-action-btn header-btn">✏️ 수정</a>
                 {% endif %}
+                
                 {% if g.user.role == 'admin' %}
                 <form action="{{ url_for('process_departure', employee_id=employee['id']) }}" method="POST" style="display: inline;">
                     <button type="submit" class="danger-action-btn header-btn" 
@@ -78,5 +84,3 @@
     </div>
 </div>
 {% endblock %}
-
-

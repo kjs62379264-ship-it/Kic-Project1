@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>재직증명서 - {{ employee.name }}</title>
+    <style>
+        body { font-family: "Batang", "Serif", sans-serif; padding: 40px; text-align: center; }
+        .container { 
+            border: 2px solid #333; padding: 50px; max-width: 800px; margin: 0 auto; min-height: 900px; 
+            position: relative;
+        }
+        h1 { font-size: 36px; text-decoration: underline; margin-bottom: 60px; letter-spacing: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; margin-top: 20px; }
+        th, td { border: 1px solid #333; padding: 15px; font-size: 16px; }
+        th { background-color: #f9f9f9; width: 120px; text-align: center; }
+        td { text-align: left; padding-left: 20px; }
+        
+        .content-text { text-align: left; line-height: 2.5; font-size: 18px; margin: 50px 20px; }
+        
+        .footer { margin-top: 100px; }
+        .date { font-size: 18px; margin-bottom: 30px; }
+        .company-name { font-size: 28px; font-weight: bold; letter-spacing: 2px; }
+        
+        .stamp-box {
+            display: inline-block;
+            position: relative;
+            margin-left: 10px;
+        }
+        .stamp-box img {
+            position: absolute;
+            top: -20px;
+            left: -20px;
+            width: 80px;
+            opacity: 0.7;
+        }
+
+        @media print {
+            .no-print { display: none; }
+            body { padding: 0; }
+            .container { border: none; }
+        }
+    </style>
+</head>
+<body onload="window.print()">
+
+    <div class="no-print" style="text-align: right; margin-bottom: 20px;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">🖨️ 인쇄하기</button>
+        <button onclick="window.close()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">닫기</button>
+    </div>
+
+    <div class="container">
+        <h1>재 직 증 명 서</h1>
+
+        <table>
+            <tr>
+                <th>성 명</th>
+                <td>{{ employee.name }}</td>
+                <th>생년월일</th>
+                <td>****** - *******</td> </tr>
+            <tr>
+                <th>주 소</th>
+                <td colspan="3">{{ employee.address }}</td>
+            </tr>
+        </table>
+
+        <table>
+            <tr>
+                <th>소 속</th>
+                <td>{{ employee.department }}</td>
+                <th>직 위</th>
+                <td>{{ employee.position }}</td>
+            </tr>
+            <tr>
+                <th>입 사 일</th>
+                <td>{{ employee.hire_date }}</td>
+                <th>재직 구분</th>
+                <td>{{ employee.status }}</td>
+            </tr>
+            <tr>
+                <th>용 도</th>
+                <td colspan="3">제출용 / 금융기관 제출용</td>
+            </tr>
+        </table>
+
+        <div class="content-text">
+            <p>위 사람은 상기와 같이 본 회사에 재직하고 있음을 증명합니다.</p>
+        </div>
+
+        <div class="footer">
+            <p class="date">{{ today }}</p>
+            <br>
+            <div class="company-name">
+                주식회사 I-TEK 대표이사
+                <div class="stamp-box">
+                    (인)
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -991,21 +991,91 @@ def salary_payroll():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    # ✨ [수정] URL 파라미터로 년/월 받기 (없으면 현재 날짜)
     year = request.args.get('year', datetime.now().year, type=int)
     month = request.args.get('month', datetime.now().month, type=int)
     
-    cur.execute("""
+    # 검색 필터 파라미터 받기
+    search_name = request.args.get('search_name', '')
+    search_dept = request.args.get('search_dept', '')
+
+    # 기본 쿼리 (직급(position) 포함)
+    sql = """
         SELECT p.*, e.name, e.department, e.position 
         FROM salary_payments p
         JOIN employees e ON p.employee_id = e.id
         WHERE p.payment_year = ? AND p.payment_month = ?
-    """, (year, month))
-    existing_payroll = cur.fetchall()
+    """
+    params = [year, month]
+
+    # 필터링 조건 추가
+    if search_name:
+        sql += " AND e.name LIKE ?"
+        params.append(f"%{search_name}%")
+    if search_dept:
+        sql += " AND e.department = ?"
+        params.append(search_dept)
+    
+    sql += " ORDER BY e.id ASC"
+
+    cur.execute(sql, params)
+    
+    # ✨ [핵심 수정] Row 객체를 dict로 변환하여 리스트로 저장
+    # (이 부분이 없으면 |tojson 에러가 발생합니다)
+    existing_payroll = [dict(row) for row in cur.fetchall()]
+    
     is_calculated = len(existing_payroll) > 0
+    
+    # [핵심] 총 합계 계산 (화면 하단 표시용)
+    grand_total = {
+        'base': 0, 'allowance': 0, 'overtime': 0, 
+        'total_pay': 0, 'deduction': 0, 'net': 0
+    }
+    
+    for p in existing_payroll:
+        grand_total['base'] += p['total_base']
+        grand_total['allowance'] += p['total_allowance']
+        grand_total['overtime'] += p['overtime_pay']
+        # 지급 총액 = 기본급 + 수당 + 야근수당
+        grand_total['total_pay'] += (p['total_base'] + p['total_allowance'] + p['overtime_pay'])
+        grand_total['deduction'] += p['total_deduction']
+        grand_total['net'] += p['net_salary']
+
+    # 부서 목록 가져오기 (검색 드롭다운용)
+    cur.execute("SELECT name FROM departments")
+    departments = [row['name'] for row in cur.fetchall()]
+    
     conn.close()
     
-    return render_template('salary_list.html', year=year, month=month, payrolls=existing_payroll, is_calculated=is_calculated)
+    return render_template('salary_list.html', 
+                           year=year, month=month, 
+                           payrolls=existing_payroll, 
+                           is_calculated=is_calculated,
+                           grand_total=grand_total,
+                           departments=departments,
+                           search_name=search_name,
+                           search_dept=search_dept)
+
+# [신규 추가] 재직증명서 출력 라우트
+@app.route('/hr/certificate/<employee_id>')
+@login_required
+def print_certificate(employee_id):
+    # 본인 또는 관리자만 출력 가능
+    if g.user['role'] != 'admin' and g.user['id'] != employee_id:
+        flash("권한이 없습니다.", "error")
+        return redirect(url_for('hr_management'))
+
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM employees WHERE id = ?", (employee_id,))
+    employee = cursor.fetchone()
+    conn.close()
+    
+    # 오늘 날짜
+    today = datetime.now().strftime('%Y년 %m월 %d일')
+    
+    return render_template('print_certificate.html', employee=employee, today=today)
 
 @app.route('/salary/download/excel')
 @admin_required
