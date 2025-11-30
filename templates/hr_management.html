@@ -1,7 +1,38 @@
 {% extends "base.html" %}
 
 {% block page_title %}인사 관리 - 직원 정보{% endblock %}
+{% block custom_styles %}
+<style>
+    /* ✅ [핵심] hr_management 페이지 전용 레이아웃 고정 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        
+        /* ✅ [수정] 상단 행 높이: 400px (카드 헤더/패딩 포함하여 내부 325px 확보) */
+        /* ✅ [수정] 하단 행 높이: 1fr (남은 공간 모두 차지) */
+        grid-template-rows: 445px 1fr; 
+        gap: 20px;
+    }
 
+    /* 직원 명부 카드 */
+    .employee-list-container {
+        grid-column: 1 / 3;
+        grid-row: 1 / 2;
+        height: 100% !important; /* 400px 높이 꽉 채움 */
+        /* 내부 card-body의 max-height: 325px와 조화됨 */
+    }
+    
+    /* 하단 카드들 (높이 자동 조정) */
+    .card:nth-of-type(2), 
+    .card:nth-of-type(3) {
+        grid-row: 2 / 3;
+        height: 100% !important; /* 남은 공간(1fr)을 꽉 채움 */
+    }
+</style>
+{% endblock %}
 {% block page_content %}
 
 <div class="card employee-list-container" style="grid-column: 1 / 3;">
@@ -128,10 +159,11 @@
     </div>
 </div>
 
-<div class="card" style="grid-column: 2 / 3; max-height: 400px;">
-    <div class="card-header">부서별 인원 현황 (재직자 기준)</div>
-    <div class="card-body" style="overflow-y: auto;">
-        <canvas id="departmentChart"></canvas>
+<div class="card" style="grid-column: 2 / 3; height: 35vh;">
+    <div class="card-header">부서별 인원 현황</div>
+    
+    <div class="card-body" style="overflow: hidden; padding: 20px; position: relative;">
+        <canvas id="departmentChart" style="width: 100%; height: 100%;"></canvas>
     </div>
 </div>
 
@@ -152,11 +184,23 @@
             }]
         },
         options: {
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
-            plugins: { legend: { display: false } }
+            responsive: true,
+            maintainAspectRatio: false, // 부모 컨테이너 높이에 맞춰 늘어남
+            scales: { 
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { stepSize: 1 } 
+                } 
+            },
+            plugins: { legend: { display: false } },
+            layout: {
+                padding: {
+                    top: 10,
+                    bottom: 0 // 차트 하단 여백 최소화
+                }
+            }
         }
     });
-
 </script>
 
 {% endblock %}

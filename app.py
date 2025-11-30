@@ -10,12 +10,14 @@ from werkzeug.utils import secure_filename
 import calendar
 from dateutil.relativedelta import relativedelta
 import math
+import uuid
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
 
 # 업로드 폴더 설정
-UPLOAD_FOLDER = os.path.join(app.static_folder, 'profile_photos')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'profile_photos')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # ----------------------------------------------------
@@ -834,22 +836,48 @@ def add_employee():
     
     if request.method == 'POST':
         try:
+            # 1. 프로필 이미지 처리 (기본값 설정)
+        
+
+            # 2. 사번 생성 로직
             dept = request.form['department']
             cur.execute("SELECT code FROM departments WHERE name=?", (dept,))
-            code = cur.fetchone()[0]
+            code_row = cur.fetchone()
+            code = code_row[0] if code_row else 'XX'
+
             prefix = f"{request.form['hire_date'][2:4]}{code}"
             cur.execute("SELECT id FROM employees WHERE id LIKE ? ORDER BY id DESC LIMIT 1", (f"{prefix}%",))
             last = cur.fetchone()
             seq = int(last[0][-4:]) + 1 if last else 1
             new_id = f"{prefix}{seq:04d}"
             
+            # ✅ [핵심 수정] 이미지 처리 (UUID 사용)
+            profile_image_filename = 'default.jpg' 
+            
+            if 'profile_image' in request.files:
+                f = request.files['profile_image']
+                if f.filename:
+                    # 1. 확장자 추출 (jpg, png 등)
+                    ext = f.filename.rsplit('.', 1)[1].lower()
+                    
+                    # 2. 랜덤한 영문 파일명 생성 (예: a1b2c3d4.jpg) - 한글 문제 해결!
+                    new_filename = f"{uuid.uuid4()}.{ext}"
+                    
+                    # 3. 폴더가 없으면 생성
+                    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+                        os.makedirs(app.config['UPLOAD_FOLDER'])
+                    
+                    # 4. 저장
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
+                    profile_image_filename = new_filename
+            # 3. DB 삽입 (profile_image 포함)
             cur.execute("""
-                INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status)
-                VALUES (?,?,?,?,?,?,?,?,?, '재직')
+                INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
+                VALUES (?,?,?,?,?,?,?,?,?, '재직', ?)
             """, (new_id, request.form['name'], dept, request.form['position'], request.form['hire_date'],
                   f"{request.form['phone1']}-{request.form['phone2']}-{request.form['phone3']}",
                   f"{request.form['email_id']}@{request.form['email_domain']}",
-                  request.form['address'], request.form['gender']))
+                  request.form['address'], request.form['gender'], profile_image_filename))
             
             cur.execute("INSERT INTO users (employee_id, username, password_hash, role) VALUES (?,?,?,?)",
                         (new_id, new_id, generate_password_hash(request.form['password']), request.form.get('role', 'user')))
@@ -857,10 +885,12 @@ def add_employee():
             conn.commit()
             flash(f"직원 {request.form['name']}({new_id}) 등록 완료", "success")
             return redirect(url_for('hr_management'))
+
         except Exception as e:
             conn.rollback()
             flash(f"등록 실패: {e}", "error")
             
+    # GET 요청 처리
     cur.execute("SELECT name FROM departments")
     d = cur.fetchall()
     cur.execute("SELECT name FROM positions")

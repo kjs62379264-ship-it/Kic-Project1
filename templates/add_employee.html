@@ -7,7 +7,7 @@
     <div class="card-header">신규 직원 정보 입력</div>
     <div class="card-body">
         {# ✨ [수정] action 경로가 올바른지 확인 (기존과 동일) #}
-        <form method="POST" action="{{ url_for('add_employee') }}">
+        <form method="POST" action="{{ url_for('add_employee') }}" enctype="multipart/form-data">
             
             <div class="form-group">
                 <label for="name">이름</label>
