@@ -2,24 +2,92 @@
 
 {% block title %}새 공지사항 작성{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* ✅ [핵심] 페이지 전체 높이를 100%로 고정하고 스크롤 방지 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: grid;
+        /* 상단(작성 폼): 내용물 크기만큼(auto) / 하단(목록): 남은 공간 전부(1fr) */
+        grid-template-rows: auto 1fr; 
+        gap: 20px;
+    }
+
+    /* 하단 카드 (목록) */
+    .card-bottom {
+        height: 100% !important; /* 할당된 공간 꽉 채우기 */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; 
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
+
 <div class="card" style="grid-column: 1 / -1;">
     <div class="card-header">
         <span>새 공지사항 작성</span>
-        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">🔙 목록으로</a>
+        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">🔙 인사 현황으로</a>
     </div>
     <div class="card-body">
         <form action="{{ url_for('add_notice_page') }}" method="POST" class="notice-form-full">
             <div class="form-group">
                 <label for="title">제목</label>
-                <input type="text" id="title" name="title" required>
+                <input type="text" id="title" name="title" required placeholder="공지 제목을 입력하세요">
             </div>
             <div class="form-group">
                 <label for="content">내용</label>
-                <textarea id="content" name="content" required rows="10"></textarea>
+                <textarea id="content" name="content" required rows="5" placeholder="공지 내용을 입력하세요"></textarea>
             </div>
-            <button type="submit" class="btn main-action-btn">등록하기</button>
+            <div style="text-align: right;">
+                <button type="submit" class="btn main-action-btn">등록하기</button>
+            </div>
         </form>
     </div>
 </div>
+
+<div class="card card-bottom" style="grid-column: 1 / -1;">
+    <div class="card-header">
+        <span>등록된 공지사항 목록</span>
+    </div>
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 0;">
+        <table class="employee-table" style="margin-top: 0; border-top: none;">
+            <thead style="position: sticky; top: 0; background-color: #f9f9f9; z-index: 1; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
+                <tr>
+                    <th style="width: 8%;">No.</th>
+                    <th>제목</th>
+                    <th style="width: 20%;">작성일</th>
+                    <th style="width: 10%; text-align: center;">관리</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for notice in notices %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        <a href="{{ url_for('view_notice', notice_id=notice.id) }}" style="text-decoration: none; color: #333; font-weight: bold;">
+                            {{ notice.title }}
+                        </a>
+                    </td>
+                    <td>{{ notice.created_at|datetimeformat('%Y-%m-%d %H:%M') }}</td>
+                    <td style="text-align: center;">
+                        <form action="{{ url_for('delete_notice', notice_id=notice.id) }}" method="POST" onsubmit="return confirm('정말 삭제하시겠습니까?');">
+                            <button type="submit" class="delete-notice-btn">삭제</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 30px; color: #7f8c8d;">등록된 공지사항이 없습니다.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 {% endblock %}

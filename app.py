@@ -1512,14 +1512,30 @@ def view_notice(notice_id):
 @app.route('/hr/notices/add', methods=['GET', 'POST'])
 @admin_required
 def add_notice_page():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
     if request.method == 'POST':
-        conn = sqlite3.connect('employees.db')
-        cur = conn.cursor()
-        cur.execute("INSERT INTO notices (title, content) VALUES (?, ?)", (request.form['title'], request.form['content']))
-        conn.commit()
-        conn.close()
-        return redirect(url_for('hr_management'))
-    return render_template('add_notice_page.html')
+        try:
+            title = request.form['title']
+            content = request.form['content']
+            cur.execute("INSERT INTO notices (title, content) VALUES (?, ?)", (title, content))
+            conn.commit()
+            flash("새 공지사항이 등록되었습니다.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"등록 중 오류가 발생했습니다: {e}", "error")
+            
+        # ✅ [수정] 작성 후 목록 확인을 위해 '현재 페이지'로 리다이렉트
+        return redirect(url_for('add_notice_page'))
+
+    # ✅ [추가] GET 요청 시: 기존 공지사항 목록 조회 (최신순)
+    cur.execute("SELECT * FROM notices ORDER BY created_at DESC")
+    notices = cur.fetchall()
+    conn.close()
+
+    return render_template('add_notice_page.html', notices=notices)
 
 @app.route('/hr/notices/delete/<int:notice_id>', methods=['POST'])
 @admin_required
@@ -1530,7 +1546,10 @@ def delete_notice(notice_id):
     conn.commit()
     conn.close()
     flash("공지사항이 삭제되었습니다.", "success")
-    return redirect(url_for('hr_management'))
+    
+    # ✅ [핵심 수정] 삭제 후 '인사 현황'이 아닌 '공지사항 작성/목록' 페이지로 복귀
+    # 이전 코드: return redirect(url_for('hr_management'))
+    return redirect(url_for('add_notice_page'))
 
 @app.route('/hr/settings')
 @admin_required

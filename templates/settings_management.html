@@ -2,14 +2,30 @@
 
 {% block title %}설정 관리{% endblock %}
 
-{# ✨ [핵심 수정] "content"를 "page_content"로 변경 #}
+{% block custom_styles %}
+<style>
+    /* 이 페이지 전용: 콘텐츠 그리드 높이 100% 및 스크롤 방지 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden;
+        padding-bottom: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 100%; /* 1개 행으로 꽉 채움 */
+        gap: 20px;
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
 
-<div class="card">
+<div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2; height: 100% !important; display: flex; flex-direction: column;">
     <div class="card-header">
         <span>부서 관리</span>
     </div>
-    <div class="card-body">
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 20px;">
+        
         <h4>새 부서 추가</h4>
         <form method="POST" action="{{ url_for('add_department') }}">
             <div style="display: flex; gap: 10px; margin-bottom: 5px;">
@@ -18,7 +34,9 @@
             </div>
             <button type="submit" class="btn sub-action-btn" style="width: 100%;">추가</button>
         </form>
-        <hr>
+        
+        <hr style="margin: 20px 0;">
+        
         <h4>현재 부서 목록</h4>
         <ul class="settings-list">
             {% for dept in departments %}
@@ -29,6 +47,41 @@
                 <div class="button-group">
                     <button class="btn sub-action-btn edit-btn" onclick="openEditModal('{{ dept['name'] }}', '{{ dept['code'] }}')">수정</button>
                     <form method="POST" action="{{ url_for('delete_department', dept_name=dept['name']) }}" onsubmit="return confirm('정말로 \'{{ dept['name'] }}\' 부서를 삭제하시겠습니까?');">
+                        <button type="submit" class="danger-action-btn">삭제</button>
+                    </form>
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2; height: 100% !important; display: flex; flex-direction: column;">
+    <div class="card-header">
+        <span>직급 관리</span>
+        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">목록으로</a>
+    </div>
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 20px;">
+        
+        <h4>새 직급 추가</h4>
+        <form method="POST" action="{{ url_for('add_position') }}" style="display: flex; gap: 10px;">
+            <input type="text" name="new_position" placeholder="새 직급명을 입력하세요" required style="flex-grow: 1;">
+            <button type="submit" class="btn sub-action-btn">추가</button>
+        </form>
+        
+        <hr style="margin: 20px 0;">
+        
+        <h4>현재 직급 목록</h4>
+        <ul class="settings-list">
+            {% for pos in positions %}
+            <li>
+                <span>{{ pos['name'] }}</span>
+                
+                {% if g.user.role == 'admin' %}
+                <div class="button-group">
+                    <form method="POST" action="{{ url_for('delete_position', pos_name=pos['name']) }}" onsubmit="return confirm('정말로 \'{{ pos['name'] }}\' 직급을 삭제하시겠습니까?');">
                         <button type="submit" class="danger-action-btn">삭제</button>
                     </form>
                 </div>
@@ -51,42 +104,10 @@
             </div>
             <div class="form-group">
                 <label for="new_dept_code_modal">새 부서 코드 (2자리)</label>
-                {# ✨ [버그 수정] name="new_department_code" -> "new_dept_code" #}
                 <input type="text" id="new_dept_code_modal" name="new_dept_code" required maxlength="2">
             </div>
             <button type="submit" class="btn main-action-btn">수정 완료</button>
         </form>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <span>직급 관리</span>
-        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">목록으로</a>
-    </div>
-    <div class="card-body">
-        <h4>새 직급 추가</h4>
-        <form method="POST" action="{{ url_for('add_position') }}" style="display: flex; gap: 10px;">
-            <input type="text" name="new_position" placeholder="새 직급명을 입력하세요" required style="flex-grow: 1;">
-            <button type="submit" class="btn sub-action-btn">추가</button>
-        </form>
-        <hr>
-        <h4>현재 직급 목록</h4>
-        <ul class="settings-list">
-            {% for pos in positions %}
-            <li>
-                <span>{{ pos['name'] }}</span>
-                
-                {% if g.user.role == 'admin' %}
-                <div class="button-group">
-                    <form method="POST" action="{{ url_for('delete_position', pos_name=pos['name']) }}" onsubmit="return confirm('정말로 \'{{ pos['name'] }}\' 직급을 삭제하시겠습니까?');">
-                        <button type="submit" class="danger-action-btn">삭제</button>
-                    </form>
-                </div>
-                {% endif %}
-            </li>
-            {% endfor %}
-        </ul>
     </div>
 </div>
 

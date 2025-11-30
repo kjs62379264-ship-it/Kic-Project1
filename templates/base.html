@@ -4,129 +4,197 @@
 
 {% block body_class %}{% block page_body_class %}{% endblock %}{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* 토스트 알림 스타일 (화면 상단 고정) */
+    .flash-messages-container {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 9999;
+        width: 80%;
+        max-width: 600px;
+        pointer-events: none;
+    }
+    .alert {
+        padding: 15px 20px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        opacity: 0;
+        transform: translateY(-20px);
+        transition: all 0.5s ease;
+        pointer-events: auto;
+    }
+    .alert.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    /* 알림 색상 */
+    .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .alert-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="main-container">
-    
-    {# g.user가 있을 때(로그인 상태)만 사이드바를 표시합니다. #}
-    {% if g.user %}
-    <aside class="sidebar">
-        <div class="profile-area">
-            <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user.profile_image or 'default.jpg')) }}');"></div>
-            <div class="user-info">
-                <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
-                <p class="user-dept">{{ g.user['department'] }}</p> 
-            </div>
-            
-            <div class="attendance-section">
-                {% if attendance_button_state == '퇴근' %}
-                    <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
-                        <button type="submit" class="btn attendance-btn check-out">퇴근</button>
-                    </form>
-                {% else %}
-                    <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
-                        <button type="submit" class="btn attendance-btn check-in">출근</button>
-                    </form>
-                {% endif %}
-                <a href="{{ url_for('my_page') }}" class="view-records-link">마이 페이지</a>
-            </div> 
-        </div> 
 
-        <nav>
-            <ul>
-                <li class="has-submenu">
-                    <a href="{{ url_for('hr_management') }}">인사 관리</a>
-                    <ul class="submenu-info">
-        <li><a href="{{ url_for('hr_management') }}">- 인사 현황</a></li>
-
-        {% if g.user.role == 'admin' %}
-            <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
-            <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
-            <li><a href="{{ url_for('add_notice_page') }}">- 공지사항 작성</a></li>
-            <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
-        {% endif %}
-    </ul>
-                </li>
-                
-                <li class="has-submenu">
-                    <a href="{{ url_for('attendance') }}">근태 관리</a>
-                    <ul class="submenu-info">
-                        <li><a href="{{ url_for('my_attendance') }}">- 나의 근태 현황</a></li> 
-                        <li><a href="{{ url_for('vacation_request') }}">- 근무/휴가 신청</a></li>
-                        {% if g.user.role == 'admin' %}
-                        <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
-                        <li><a href="{{ url_for('attendance_request') }}">- 근태 요청 처리 (관리)</a></li>
-                        <li><a href="{{ url_for('attendance_employee') }}">- 직원 근태 조회 (관리)</a></li>
-                        <li><a href="{{ url_for('attendance') }}">- 실시간 현황 (관리)</a></li>
-                        {% endif %}
-                    </ul>
-                </li>
-
-                <li class="has-submenu">
-                    <a href="#">급여 관리</a> 
-                    <ul class="submenu-info">
-                        <li><a href="{{ url_for('my_salary') }}">- 나의 급여 명세서</a></li>
-                        
-                        {% if g.user.role == 'admin' %}
-                        <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
-                        <li><a href="{{ url_for('salary_payroll') }}">- 급여 대장 관리</a></li>
-                        <li><a href="{{ url_for('salary_contracts') }}">- 연봉/계좌 관리</a></li>
-                        <li><a href="{{ url_for('salary_deductions') }}">- 공제 항목 관리</a></li>
-                        <li><a href="{{ url_for('salary_settings') }}">- 환경 설정 (요율)</a></li>
-                        {% endif %}
-                    </ul>
-                </li>
-                
-                <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
-                <li><a href="{{ url_for('change_password') }}">비밀번호 변경</a></li>
-                <li><a href="{{ url_for('logout') }}" class="logout-link" style="color: #e74c3c;">로그아웃</a></li>
-            </ul>
-        </nav>
-    </aside>
-    {% endif %} 
-    
-    <main class="content-grid">
-        
+    <div class="flash-messages-container">
         {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div style="grid-column: 1 / -1;">
+            {% if messages %}
                 {% for category, message in messages %}
                     <div class="alert {{ 'alert-danger' if category == 'error' else 'alert-success' }}">
                         {{ message }}
                     </div>
                 {% endfor %}
-            </div>
-        {% endif %}
+            {% endif %}
+        {% endwith %}
+    </div>
 
-        {# 페이지별 컨텐츠가 들어갈 자리 #}
+    <div class="main-container">
+        
+        {# 2. 사이드바 (로그인 시에만 표시) #}
+        {% if g.user %}
+        <aside class="sidebar">
+            <div class="profile-area">
+                <div class="profile-photo" style="background-image: url('{{ url_for('static', filename='profile_photos/' + (g.user.profile_image or 'default.jpg')) }}');"></div>
+                <div class="user-info">
+                    <p class="user-name">{{ g.user['name'] }} ({{ g.user['position'] }})</p> 
+                    <p class="user-dept">{{ g.user['department'] }}</p> 
+                </div>
+                
+                <div class="attendance-section">
+                    {% if attendance_button_state == '퇴근' %}
+                        <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
+                            <button type="submit" class="btn attendance-btn check-out">퇴근</button>
+                        </form>
+                    {% else %}
+                        <form id="clock-form" action="{{ url_for('clock') }}" method="POST">
+                            <button type="submit" class="btn attendance-btn check-in">출근</button>
+                        </form>
+                    {% endif %}
+                    <a href="{{ url_for('my_page') }}" class="view-records-link">마이 페이지</a>
+                </div> 
+            </div> 
+
+            <nav>
+                <ul>
+                    <li class="has-submenu">
+                        <a href="javascript:void(0);">인사 관리</a>
+                        <ul class="submenu-info">
+                            <li><a href="{{ url_for('hr_management') }}">- 인사 현황</a></li>
+                            {% if g.user.role == 'admin' %}
+                            <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
+                            <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
+                            <li><a href="{{ url_for('add_notice_page') }}">- 공지사항 작성</a></li>
+                            <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    
+                    <li class="has-submenu">
+                        <a href="javascript:void(0);">근태 관리</a>
+                        <ul class="submenu-info">
+                            <li><a href="{{ url_for('my_attendance') }}">- 나의 근태 현황</a></li> 
+                            <li><a href="{{ url_for('vacation_request') }}">- 근무/휴가 신청</a></li>
+                            
+                            {% if g.user.role == 'admin' %}
+                            <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
+                            <li><a href="{{ url_for('attendance_request') }}">- 근태 요청 처리 (관리)</a></li>
+                            <li><a href="{{ url_for('attendance_employee') }}">- 직원 근태 조회 (관리)</a></li>
+                            <li><a href="{{ url_for('attendance') }}">- 실시간 현황 (관리)</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+
+                    <li class="has-submenu">
+                        <a href="javascript:void(0);">급여 관리</a> 
+                        <ul class="submenu-info">
+                            <li><a href="{{ url_for('my_salary') }}">- 나의 급여 명세서</a></li>
+                            
+                            {% if g.user.role == 'admin' %}
+                            <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
+                            <li><a href="{{ url_for('salary_payroll') }}">- 급여 대장 관리</a></li>
+                            <li><a href="{{ url_for('salary_contracts') }}">- 연봉/계좌 관리</a></li>
+                            <li><a href="{{ url_for('salary_deductions') }}">- 공제 항목 관리</a></li>
+                            <li><a href="{{ url_for('salary_settings') }}">- 환경 설정 (요율)</a></li>
+                            {% endif %}
+                        </ul>
+                    </li>
+                    
+                    <li style="border-top: 1px solid #eee; margin-top: 10px; padding-top: 10px;"></li>
+                    <li><a href="{{ url_for('change_password') }}">비밀번호 변경</a></li>
+                    <li><a href="{{ url_for('logout') }}" class="logout-link" style="color: #e74c3c;">로그아웃</a></li>
+                </ul>
+            </nav>
+        </aside>
+        {% endif %} 
+        
+        <main class="content-grid">
         {% block page_content %}
         {% endblock %}
-        
-        {% endwith %}
     </main>
 </div>
 
 <script>
-    // 1. 출퇴근 버튼 AJAX 처리 로직
     document.addEventListener('DOMContentLoaded', function() {
+        
+        // -------------------------------------------------------
+        // 1. 사이드바 메뉴 토글 (클릭 시 열림/닫힘)
+        // -------------------------------------------------------
+        const menuToggles = document.querySelectorAll('.sidebar .has-submenu > a');
+
+        menuToggles.forEach(toggle => {
+            toggle.addEventListener('click', function(e) {
+                // 상위 메뉴(인사 관리, 근태 관리 등)를 클릭했을 때만 동작
+                e.preventDefault(); // 페이지 이동 방지
+                
+                const parentLi = this.parentElement;
+                
+                // (선택 사항) 다른 메뉴를 클릭하면 기존 열린 메뉴 닫기
+                // document.querySelectorAll('.sidebar .has-submenu').forEach(item => {
+                //    if (item !== parentLi) item.classList.remove('open');
+                // });
+
+                // ✅ [핵심] 'open' 클래스를 토글 (CSS와 일치해야 함)
+                parentLi.classList.toggle('open'); 
+            });
+        });
+
+        // -------------------------------------------------------
+        // 2. 토스트 알림 애니메이션
+        // -------------------------------------------------------
+        const alerts = document.querySelectorAll('.flash-messages-container .alert');
+        alerts.forEach(alert => {
+            setTimeout(() => { alert.classList.add('show'); }, 100);
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => { alert.remove(); }, 500);
+            }, 3000);
+        });
+
+        // -------------------------------------------------------
+        // 3. 출퇴근 버튼 AJAX 처리
+        // -------------------------------------------------------
         const clockForm = document.querySelector('#clock-form');
         const clockBtn = document.querySelector('.attendance-section .attendance-btn');
         
         if (clockForm) {
             clockForm.addEventListener('submit', function(e) {
                 e.preventDefault(); 
-                
                 clockBtn.disabled = true;
                 clockBtn.textContent = '처리 중...';
 
                 fetch(clockForm.action, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                     body: JSON.stringify({})
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) return response.text().then(text => { throw new Error(text) });
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         alert(data.message); 
@@ -134,57 +202,39 @@
                         clockBtn.className = 'btn attendance-btn ' + (data.new_button_state === '퇴근' ? 'check-out' : 'check-in');
                         clockBtn.disabled = false;
                         
-                        const myAttendanceUrl = "{{ url_for('my_attendance') }}";
-                        if (window.location.pathname.includes(myAttendanceUrl)) {
+                        const myAttendancePath = "{{ url_for('my_attendance') }}".split('?')[0];
+                        const currentPath = window.location.pathname;
+                        if (currentPath === myAttendancePath || currentPath === myAttendancePath + '/') {
                             window.location.reload(); 
                         }
                     } else {
                         alert('기록 실패: ' + data.message);
                         clockBtn.disabled = false;
-                        clockBtn.textContent = clockBtn.classList.contains('check-in') ? '출근' : '퇴근';
                     }
                 })
                 .catch(error => {
                     console.error('Fetch Error:', error);
-                    alert('서버 통신 중 오류가 발생했습니다.');
+                    alert('오류가 발생했습니다: ' + error.message);
                     clockBtn.disabled = false;
                 });
             });
         }
     });
 
-    // 2. 달력 월 이동 함수 (전역 사용)
+    // -------------------------------------------------------
+    // 4. 전역 유틸리티 함수 (달력 이동 등)
+    // -------------------------------------------------------
     function changeMonth(year, month) {
         if (month < 1) { year -= 1; month = 12; }
         if (month > 12) { year += 1; month = 1; }
-        
         const url = new URL(window.location.href);
         url.searchParams.set('year', year);
         url.searchParams.set('month', month);
         window.location.href = url.toString();
     }
-
-    // ✨ 3. [신규] 사이드바 메뉴 클릭 토글 기능
-    // (CSS에서 .sidebar .has-submenu:hover 스타일을 제거해야 효과가 있습니다)
-    document.addEventListener('DOMContentLoaded', function() {
-        const menuToggles = document.querySelectorAll('.sidebar .has-submenu > a');
-
-        menuToggles.forEach(toggle => {
-            toggle.addEventListener('click', function(e) {
-                e.preventDefault(); // 페이지 이동 방지 (드롭다운 열기 위함)
-                const parentLi = this.parentElement;
-                
-                // (선택) 다른 메뉴 닫기: 원하시면 주석 해제하세요
-                /*
-                document.querySelectorAll('.sidebar .has-submenu').forEach(item => {
-                    if (item !== parentLi) item.classList.remove('open');
-                });
-                */
-
-                parentLi.classList.toggle('open'); // 'open' 클래스 토글
-            });
-        });
-    });
 </script>
+
+{# ✅ [매우 중요] 자식 템플릿(vacation_request 등)의 스크립트가 들어갈 자리 #}
+{% block scripts %}{% endblock %}
 
 {% endblock %}

@@ -2,17 +2,35 @@
 
 {% block page_title %}신규 직원 등록{% endblock %}
 
+{# ✅ [핵심] 이 페이지 전용 레이아웃 설정 (화면 꽉 채우기) #}
+{% block custom_styles %}
+<style>
+    .content-grid {
+        grid-template-rows: 100%; /* 행 높이를 화면 전체로 확장 */
+        padding-bottom: 0; /* 하단 여백 제거 */
+        overflow: hidden; /* 전체 스크롤 방지 */
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
-<div class="card" style="grid-column: 1 / 3;">
+<div class="card" style="grid-column: 1 / 3; height: 100%; display: flex; flex-direction: column;">
     <div class="card-header">신규 직원 정보 입력</div>
-    <div class="card-body">
-        {# ✨ [수정] action 경로가 올바른지 확인 (기존과 동일) #}
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 20px;">
+        
         <form method="POST" action="{{ url_for('add_employee') }}" enctype="multipart/form-data">
             
             <div class="form-group">
                 <label for="name">이름</label>
                 <input type="text" id="name" name="name" required>
             </div>
+
+            <div class="form-group">
+                <label for="profile_image">프로필 사진</label>
+                <input type="file" id="profile_image" name="profile_image" accept="image/*">
+            </div>
+
             <div class="form-group">
                 <label for="department">부서</label>
                 <select id="department" name="department" required>
@@ -75,7 +93,7 @@
             </div>
             {% endif %}
 
-            <div class="form-actions">
+            <div class="form-actions" style="margin-top: 30px; padding-bottom: 10px;">
                 <button type="submit" class="btn main-action-btn">저장하기</button>
                 <a href="{{ url_for('hr_management') }}" class="btn sub-action-btn">목록으로</a>
             </div>
