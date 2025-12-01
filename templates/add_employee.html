@@ -71,6 +71,25 @@
                 <input type="text" id="address" name="address">
             </div>
             <div class="form-group">
+                <label>급여 계좌 (은행 / 계좌번호)</label>
+                <div style="display: flex; gap: 10px;">
+                    
+                    <select name="bank_name" style="width: 130px; flex-shrink: 0; text-align: center; text-align-last: center;">
+                        
+                        <option value="" style="text-align: center;">-- 은행 --</option>
+                        
+                        <option value="국민은행" style="text-align: left; padding-left: 10px;">국민</option>
+                        <option value="신한은행" style="text-align: left; padding-left: 10px;">신한</option>
+                        <option value="우리은행" style="text-align: left; padding-left: 10px;">우리</option>
+                        <option value="하나은행" style="text-align: left; padding-left: 10px;">하나</option>
+                        <option value="농협" style="text-align: left; padding-left: 10px;">농협</option>
+                        <option value="카카오뱅크" style="text-align: left; padding-left: 10px;">카카오뱅크</option>
+                    </select>
+                    
+                    <input type="text" name="account_number" placeholder="계좌번호를 입력하세요 (하이픈 포함)" style="flex-grow: 1;">
+                </div>
+            </div>
+            <div class="form-group">
                 <label>성별</label>
                 <div class="gender-group">
                     <label><input type="radio" name="gender" value="남성" checked> 남성</label>

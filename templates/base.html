@@ -86,7 +86,7 @@
                     <li class="has-submenu">
                         <a href="javascript:void(0);">인사 관리</a>
                         <ul class="submenu-info">
-                            <li><a href="{{ url_for('hr_management') }}">- 인사 현황</a></li>
+                            <li><a href="{{ url_for('hr_management') }}">- 직원 명부</a></li>
                             {% if g.user.role == 'admin' %}
                             <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
                             <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>

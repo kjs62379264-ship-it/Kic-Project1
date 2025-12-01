@@ -1,41 +1,42 @@
 {% extends "base.html" %}
 
 {% block page_title %}인사 관리 - 직원 정보{% endblock %}
+
+{# ✅ [핵심] 이 페이지 전용 스타일 추가 #}
 {% block custom_styles %}
 <style>
-    /* ✅ [핵심] hr_management 페이지 전용 레이아웃 고정 */
+    /* 1. 메인 그리드를 1열 1행으로 만들고 높이를 100%로 고정 */
     .content-grid {
-        height: 100%;
-        overflow: hidden; 
-        padding-bottom: 0; 
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        
-        /* ✅ [수정] 상단 행 높이: 400px (카드 헤더/패딩 포함하여 내부 325px 확보) */
-        /* ✅ [수정] 하단 행 높이: 1fr (남은 공간 모두 차지) */
-        grid-template-rows: 445px 1fr; 
-        gap: 20px;
+        display: flex !important; /* Grid 대신 Flex 사용 (더 확실함) */
+        flex-direction: column !important;
+        height: 100% !important;
+        padding-bottom: 0 !important;
+        overflow: hidden !important;
     }
 
-    /* 직원 명부 카드 */
+    /* 2. 직원 명부 카드가 남은 공간을 모두 차지하도록 설정 */
     .employee-list-container {
-        grid-column: 1 / 3;
-        grid-row: 1 / 2;
-        height: 100% !important; /* 400px 높이 꽉 채움 */
-        /* 내부 card-body의 max-height: 325px와 조화됨 */
+        flex-grow: 1 !important;
+        height: 100% !important;
+        margin-bottom: 0 !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
-    
-    /* 하단 카드들 (높이 자동 조정) */
-    .card:nth-of-type(2), 
-    .card:nth-of-type(3) {
-        grid-row: 2 / 3;
-        height: 100% !important; /* 남은 공간(1fr)을 꽉 채움 */
+
+    /* 3. 카드 바디가 내부에서 꽉 차고 스크롤되도록 설정 */
+    .employee-list-container .card-body {
+        flex-grow: 1 !important;
+        height: 100% !important;
+        overflow-y: auto !important;
+        padding: 0 20px 10px 20px !important;
+        max-height: none !important; /* 혹시 모를 max-height 제거 */
     }
 </style>
 {% endblock %}
+
 {% block page_content %}
 
-<div class="card employee-list-container" style="grid-column: 1 / 3;">
+<div class="card employee-list-container">
     
     <div class="card-header employee-list-header">
         <div>직원 명부 (총 {{ employee_count }}명)</div>
@@ -51,15 +52,13 @@
         <form method="GET" action="{{ url_for('hr_management') }}">
             <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                 <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; flex-grow: 1;">
-                    <span>사번: <input type="text" name="id" placeholder="사번으로 검색" style="width: 120px;" value="{{ request.args.get('id', '') }}"></span>
-                    <span>이름: <input type="text" name="name" placeholder="이름으로 검색" style="width: 120px;" value="{{ request.args.get('name', '') }}"></span>
+                    <span>사번: <input type="text" name="id" placeholder="사번" style="width: 100px;" value="{{ request.args.get('id', '') }}"></span>
+                    <span>이름: <input type="text" name="name" placeholder="이름" style="width: 100px;" value="{{ request.args.get('name', '') }}"></span>
                     <span>부서: 
                         <select name="department">
                             <option value="" {% if request.args.get('department', '') == '' %}selected{% endif %}>-- 전체 --</option>
                             {% for dept in departments %}
-                            <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>
-                                {{ dept['name'] }}
-                            </option>
+                            <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>{{ dept['name'] }}</option>
                             {% endfor %}
                         </select>
                     </span>
@@ -67,17 +66,8 @@
                         <select name="position">
                             <option value="" {% if request.args.get('position', '') == '' %}selected{% endif %}>-- 전체 --</option>
                             {% for pos in positions %}
-                            <option value="{{ pos['name'] }}" {% if request.args.get('position') == pos['name'] %}selected{% endif %}>
-                                {{ pos['name'] }}
-                            </option>
+                            <option value="{{ pos['name'] }}" {% if request.args.get('position') == pos['name'] %}selected{% endif %}>{{ pos['name'] }}</option>
                             {% endfor %}
-                        </select>
-                    </span>
-                    <span>성별: 
-                        <select name="gender">
-                            <option value="" {% if request.args.get('gender', '') == '' %}selected{% endif %}>-- 전체 --</option>
-                            <option value="남성" {% if request.args.get('gender') == '남성' %}selected{% endif %}>남성</option>
-                            <option value="여성" {% if request.args.get('gender') == '여성' %}selected{% endif %}>여성</option>
                         </select>
                     </span>
                     <span>상태: 
@@ -96,7 +86,7 @@
         </form>
     </div>
     
-    <div class="card-body" style="padding: 0 20px 10px 20px; overflow-y: auto; max-height: 325px;">
+    <div class="card-body" style="flex-grow: 1; padding: 0 20px 10px 20px; overflow-y: auto;">
         
         <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
 
@@ -123,84 +113,12 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="5" style="text-align: center;">등록된 직원이 없습니다.</td>
+                <td colspan="5" style="text-align: center; padding: 50px;">등록된 직원이 없습니다.</td>
             </tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-
-<div class="card" style="grid-column: 1 / 2;">
-    <div class="card-header employee-list-header">
-        <span>최신 공지</span>
-        {% if g.user.role == 'admin' %}
-        <a href="{{ url_for('add_notice_page') }}" class="sub-action-btn header-btn">➕ 새 글 작성</a>
-        {% endif %}
-    </div>
-    <div class="card-body notice-list">
-        {% for notice in notices %}
-        <div class="notice-item">
-            <div class="notice-header">
-                <a href="{{ url_for('view_notice', notice_id=notice['id']) }}" class="notice-title-link">
-                    <strong>{{ notice['title'] }}</strong>
-                </a>
-                {% if g.user.role == 'admin' %}
-                <form action="{{ url_for('delete_notice', notice_id=notice['id']) }}" method="POST" onsubmit="return confirm('이 공지를 삭제하시겠습니까?');" style="display: inline;">
-                    <button type="submit" class="delete-notice-btn">X</button>
-                </form>
-                {% endif %}
-            </div>
-            <p class="notice-content-preview">{{ (notice['content']|striptags|truncate(80))|replace('\n', ' ') }}</p>
-        </div>
-        {% else %}
-        <p>등록된 공지사항이 없습니다.</p>
-        {% endfor %}
-    </div>
-</div>
-
-<div class="card" style="grid-column: 2 / 3; height: 35vh;">
-    <div class="card-header">부서별 인원 현황</div>
-    
-    <div class="card-body" style="overflow: hidden; padding: 20px; position: relative;">
-        <canvas id="departmentChart" style="width: 100%; height: 100%;"></canvas>
-    </div>
-</div>
-
-<script>
-    const deptLabels = {{ dept_labels|tojson }};
-    const deptCounts = {{ dept_counts|tojson }};
-    const ctx = document.getElementById('departmentChart');
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: deptLabels,
-            datasets: [{
-                label: '부서별 인원',
-                data: deptCounts,
-                borderWidth: 1,
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false, // 부모 컨테이너 높이에 맞춰 늘어남
-            scales: { 
-                y: { 
-                    beginAtZero: true, 
-                    ticks: { stepSize: 1 } 
-                } 
-            },
-            plugins: { legend: { display: false } },
-            layout: {
-                padding: {
-                    top: 10,
-                    bottom: 0 // 차트 하단 여백 최소화
-                }
-            }
-        }
-    });
-</script>
 
 {% endblock %}
