@@ -19,9 +19,10 @@ body {
 }
 
 /* --- 2. 사이드바 및 메뉴 스타일 --- */
+/* --- 2. 사이드바 및 메뉴 스타일 --- */
 .sidebar {
     background-color: #ffffff; 
-    width: 240px; 
+    width: 245px; 
     padding: 20px;
     border-radius: 15px; 
     margin-right: 20px; 
@@ -32,8 +33,22 @@ body {
 
     height: 100%;
     box-sizing: border-box;
-    overflow-y: auto;
+    
+    /* ✅ [핵심 1] 스크롤은 가능하게 설정 */
+    overflow-y: auto; 
+
+    /* ✅ [핵심 2] 파이어폭스(Firefox)에서 스크롤바 숨김 */
+    scrollbar-width: none; 
+    
+    /* ✅ [핵심 3] 인터넷 익스플로러, 엣지(구버전)에서 스크롤바 숨김 */
+    -ms-overflow-style: none; 
 }
+
+/* ✅ [핵심 4] 크롬, 사파리, 오페라 등 웹킷 기반 브라우저에서 스크롤바 숨김 */
+.sidebar::-webkit-scrollbar {
+    display: none;
+}
+
 .sidebar ul {
     list-style-type: none; 
     padding: 0; 
@@ -43,6 +58,7 @@ body {
     margin-top: 5px;
     border-top: 1px solid #eee;
 }
+
 .sidebar a {
     display: block; 
     padding: 15px 20px; 
@@ -53,6 +69,9 @@ body {
     font-size: 1.1em;
     font-weight: 500;
     margin: 5px 0;
+    
+    /* ✅ [핵심 3] 글자가 길어져도 절대 줄바꿈 하지 않음 (1줄 유지) */
+    white-space: nowrap; 
 }
 .sidebar a:hover,
 .sidebar .has-submenu:hover > a {

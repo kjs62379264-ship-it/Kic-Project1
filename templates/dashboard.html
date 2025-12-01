@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}메인 대시보드{% endblock %}
+{% block body_class %}dashboard-page{% endblock %}
+
+{% block custom_styles %}
+<style>
+    /* ✅ [핵심] 대시보드 페이지 전용 레이아웃 고정 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; /* 전체 스크롤 방지 */
+        padding-bottom: 0; 
+        display: grid;
+        /* 3열 2행 */
+        grid-template-columns: repeat(3, 1fr); 
+        /* ✅ [핵심] 2행이 화면 높이를 50:50으로 나눠가짐 */
+        grid-template-rows: 1fr 1fr; 
+        gap: 20px;
+    }
+
+    /* 카드 공통 스타일 */
+    .card {
+        height: 100% !important; /* 그리드 셀 높이 꽉 채움 */
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* 카드 밖으로 내용 넘침 방지 */
+    }
+    
+    .card-body {
+        flex-grow: 1; 
+        overflow-y: auto; /* 내용이 많으면 카드 안에서만 스크롤 */
+        padding: 20px;
+    }
+    
+    /* 차트 컨테이너 */
+    .chart-container {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* (기존 스타일 유지) */
+    .attendance-summary-circles {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        height: 100%;
+    }
+    .status-circle-item { text-align: center; }
+    .status-circle-item .circle {
+        width: 80px; height: 80px; line-height: 80px;
+        border-radius: 50%; color: white; font-weight: bold; font-size: 1.2em;
+        margin: 0 auto 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .green-bg { background-color: #2ecc71; }
+    .blue-bg { background-color: #3498db; }
+    .orange-bg { background-color: #f39c12; }
+    .red-bg { background-color: #e74c3c; }
+    .status-circle-item .label { font-weight: bold; color: #555; }
+
+    .notice-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+    .notice-item:last-child { border-bottom: none; }
+    .notice-title-link { font-size: 1.05em; color: #2c3e50; text-decoration: none; display: block; margin-bottom: 5px; }
+    .notice-title-link:hover { text-decoration: underline; color: #3498db; }
+    .notice-date { font-size: 0.85em; color: #95a5a6; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+
+    <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
+        <div class="card-header">👋 환영합니다!</div>
+        <div class="card-body" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
+            <h3 style="margin-bottom: 15px; color: #2c3e50;">{{ g.user.name }} {{ g.user.position }}님</h3>
+            <p style="color: #7f8c8d; margin-bottom: 30px;">오늘도 힘찬 하루 보내세요!</p>
+            <div style="display: flex; gap: 15px; width: 100%;">
+                <a href="{{ url_for('my_attendance') }}" class="btn main-action-btn" style="flex: 1; padding: 12px;">📅 나의 근태</a>
+                <a href="{{ url_for('vacation_request') }}" class="btn sub-action-btn" style="flex: 1; padding: 12px;">📝 휴가 신청</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
+        <div class="card-header">📊 오늘의 근무 현황 (총 {{ total_employees_count }}명)</div>
+        
+        <div class="card-body" style="flex-grow: 1; overflow: hidden; padding: 10px; display: flex; align-items: center; justify-content: center;">
+            
+            <div class="attendance-summary-circles" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: auto;">
+                
+                <div class="status-circle-item">
+                    <div class="circle green-bg" style="width: 90px; height: 90px; line-height: 70px; font-size: 1.1em;">
+                        <span class="count">{{ status_counts['재실'] }}</span>명
+                    </div>
+                    <div class="label">재실</div>
+                </div>
+                
+                <div class="status-circle-item">
+                    <div class="circle blue-bg" style="width: 90px; height: 90px; line-height: 70px; font-size: 1.1em;">
+                        <span class="count">{{ status_counts['휴가'] }}</span>명
+                    </div>
+                    <div class="label">휴가</div>
+                </div>
+                
+                <div class="status-circle-item">
+                    <div class="circle orange-bg" style="width: 90px; height: 90px; line-height: 70px; font-size: 1.1em;">
+                        <span class="count">{{ status_counts['외근/출장'] }}</span>명
+                    </div>
+                    <div class="label">외근</div>
+                </div>
+                
+                <div class="status-circle-item">
+                    <div class="circle red-bg" style="width: 90px; height: 90px; line-height: 70px; font-size: 1.1em;">
+                        <span class="count">{{ status_counts['부재'] }}</span>명
+                    </div>
+                    <div class="label">부재</div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: 3 / 4; grid-row: 1 / 2;">
+        <div class="card-header">🌤️ 오늘의 리프레시</div>
+        <div class="card-body" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;">
+            
+            <div id="weather-widget" style="margin-bottom: 20px;">
+                {% if weather %}
+                    <img src="http://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" alt="날씨 아이콘" style="width: 80px;">
+                    <div>
+                        <span style="font-size: 1.5em; font-weight: bold; color: #2c3e50;">{{ weather.temp }}°C</span>
+                        <span style="color: #7f8c8d; margin-left: 5px;">{{ weather.desc }}</span>
+                    </div>
+                    <div style="font-size: 0.85em; color: #aaa; margin-top: 5px;">
+                        서울시 서대문구 가좌로
+                    </div>
+                {% else %}
+                   {% endif %}
+            </div>
+
+            <hr style="width: 80%; border: 0; border-top: 1px solid #eee; margin: 10px 0 20px 0;">
+
+            <div id="quote-widget">
+                <p id="quote-text" style="font-size: 1em; color: #555; font-style: italic; margin-bottom: 10px; word-break: keep-all;">
+                    "성공은 매일 반복되는 작은 노력들의 합이다."
+                </p>
+                <p id="quote-author" style="font-size: 0.9em; color: #999; font-weight: bold;">
+                    - 로버트 콜리어 -
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: 1 / 2; grid-row: 2 / 3;">
+        <div class="card-header employee-list-header" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>📢 최신 공지</span>
+            {% if g.user.role == 'admin' %}
+            <a href="{{ url_for('add_notice_page') }}" class="sub-action-btn header-btn" style="font-size: 0.8em; padding: 3px 8px;">
+                ➕ 작성
+            </a>
+            {% endif %}
+        </div>
+        <div class="card-body" style="padding-top: 0;">
+            {% if notices %}
+                {% for notice in notices %}
+                <div class="notice-item">
+                    <a href="{{ url_for('view_notice', notice_id=notice['id']) }}" class="notice-title-link">
+                        {{ notice['title'] }}
+                    </a>
+                    <span class="notice-date">{{ notice['created_at']|datetimeformat('%Y-%m-%d') }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="text-align: center; color: #95a5a6; padding-top: 20px;">등록된 공지사항이 없습니다.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: 2 / 3; grid-row: 2 / 3;">
+        <div class="card-header">🏢 부서별 인원 현황</div>
+        <div class="card-body" style="overflow: hidden; padding: 20px; display: flex; align-items: center; justify-content: center;">
+            <div class="chart-container">
+                <canvas id="departmentChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="grid-column: 3 / 4; grid-row: 2 / 3;">
+        <div class="card-header">💰 급여 요약</div>
+        <div class="card-body" style="display: flex; flex-direction: column; justify-content: center; padding: 20px;">
+            
+            <div style="margin-bottom: 20px; text-align: center;">
+                <p style="margin: 0 0 5px 0; color: #7f8c8d; font-size: 0.9em;">월 기본급</p>
+                <div class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer; font-size: 1.4em; font-weight: bold; color: #2c3e50;">
+                    <span class="hidden-text" style="letter-spacing: 2px;">*******</span>
+                    <span class="real-text" style="display: none;">{{ base_salary|comma }} 원</span>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <p style="margin: 0 0 5px 0; color: #7f8c8d; font-size: 0.9em;">
+                    최근 실수령액 {% if last_payment_month %}({{ last_payment_month }}월){% endif %}
+                </p>
+                <div class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer; font-size: 1.6em; font-weight: bold; color: #27ae60;">
+                    <span class="hidden-text" style="letter-spacing: 2px; color: #27ae60;">*******</span>
+                    <span class="real-text" style="display: none;">{{ last_net_salary|comma }} 원</span>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; text-align: center; padding-top: 15px;">
+                <a href="{{ url_for('my_salary') }}" style="font-size: 0.85em; color: #999; text-decoration: underline;">
+                    상세 명세서 보기 &gt;
+                </a>
+            </div>
+        </div>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // -------------------------------------------------------
+        // 1. 부서별 인원 현황 차트 초기화 (Chart.js)
+        // -------------------------------------------------------
+        const ctx = document.getElementById('departmentChart');
+        
+        if (ctx) {
+            // Flask에서 전달받은 데이터
+            const deptLabels = {{ dept_labels|tojson }};
+            const deptCounts = {{ dept_counts|tojson }};
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: deptLabels,
+                    datasets: [{
+                        label: '인원(명)',
+                        data: deptCounts,
+                        backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                        borderColor: 'rgba(52, 152, 219, 1)',
+                        borderWidth: 1,
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false, /* 부모 컨테이너(card-body)에 맞춤 */
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            ticks: { stepSize: 1 } 
+                        },
+                        x: { 
+                            grid: { display: false } 
+                        }
+                    },
+                    plugins: { 
+                        legend: { display: false } 
+                    },
+                    layout: { 
+                        padding: 10 
+                    }
+                }
+            });
+        }
+
+        // -------------------------------------------------------
+        // 2. 급여 정보 마스킹 토글 (클릭 시 보이기/숨기기)
+        // -------------------------------------------------------
+        const blurItems = document.querySelectorAll('.security-blur');
+        
+        blurItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const hidden = this.querySelector('.hidden-text');
+                const real = this.querySelector('.real-text');
+                
+                // 현재 상태 확인 후 토글
+                if (real.style.display === 'none') {
+                    // 보이기
+                    real.style.display = 'inline';
+                    hidden.style.display = 'none';
+                } else {
+                    // 숨기기
+                    real.style.display = 'none';
+                    hidden.style.display = 'inline';
+                }
+            });
+        });
+        // 1. 명언 데이터
+        const quotes = [
+            { text: "행동만이 삶에 힘을 주고, 절제만이 삶에 매력을 준다.", author: "장 폴 리히터" },
+            { text: "성공은 매일 반복되는 작은 노력들의 합이다.", author: "로버트 콜리어" },
+            { text: "기회는 일어나는 것이 아니라 만들어내는 것이다.", author: "크리스 그로서" },
+            { text: "멈추지 않는 한 얼마나 천천히 가는지는 중요하지 않다.", author: "공자" },
+            { text: "위대한 일은 힘이 아니라 끈기로 이루어진다.", author: "새뮤얼 존슨" },
+            { text: "피할 수 없으면 즐겨라.", author: "로버트 엘리엇" },
+            { text: "오늘 걷지 않으면 내일은 뛰어야 한다.", author: "푸욜" }
+        ];
+
+    
+
+        // 3. 랜덤 적용
+        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+        const randomWeather = weathers[Math.floor(Math.random() * weathers.length)];
+
+        document.getElementById('quote-text').innerText = `"${randomQuote.text}"`;
+        document.getElementById('quote-author').innerText = `- ${randomQuote.author} -`;
+
+        document.getElementById('weather-icon').innerText = randomWeather.icon;
+        document.getElementById('weather-temp').innerText = randomWeather.temp;
+        document.getElementById('weather-desc').innerText = randomWeather.desc;
+    });
+</script>
+{% endblock %}

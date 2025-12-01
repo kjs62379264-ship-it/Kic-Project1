@@ -80,6 +80,9 @@
 
             <nav>
                 <ul>
+                    <li>
+                        <a href="{{ url_for('dashboard') }}">메인 화면</a>
+                    </li>
                     <li class="has-submenu">
                         <a href="javascript:void(0);">인사 관리</a>
                         <ul class="submenu-info">
@@ -141,29 +144,26 @@
     document.addEventListener('DOMContentLoaded', function() {
         
         // -------------------------------------------------------
-        // 1. 사이드바 메뉴 토글 (클릭 시 열림/닫힘)
+        // 1. 사이드바 메뉴 토글 (클릭 시 열림/닫힘) - [누락된 부분 복구]
         // -------------------------------------------------------
         const menuToggles = document.querySelectorAll('.sidebar .has-submenu > a');
 
         menuToggles.forEach(toggle => {
             toggle.addEventListener('click', function(e) {
-                // 상위 메뉴(인사 관리, 근태 관리 등)를 클릭했을 때만 동작
-                e.preventDefault(); // 페이지 이동 방지
-                
-                const parentLi = this.parentElement;
-                
-                // (선택 사항) 다른 메뉴를 클릭하면 기존 열린 메뉴 닫기
-                // document.querySelectorAll('.sidebar .has-submenu').forEach(item => {
-                //    if (item !== parentLi) item.classList.remove('open');
-                // });
-
-                // ✅ [핵심] 'open' 클래스를 토글 (CSS와 일치해야 함)
-                parentLi.classList.toggle('open'); 
+                // href가 없거나 javascript:void(0)인 경우만 토글 동작 (상위 메뉴)
+                const href = this.getAttribute('href');
+                if (!href || href === '#' || href === 'javascript:void(0);') {
+                    e.preventDefault(); // 페이지 이동 방지
+                    const parentLi = this.parentElement;
+                    
+                    // ✅ [핵심] 'open' 클래스를 토글 (CSS의 .sidebar .has-submenu.open 과 일치해야 함)
+                    parentLi.classList.toggle('open'); 
+                }
             });
         });
 
         // -------------------------------------------------------
-        // 2. 토스트 알림 애니메이션
+        // 2. 토스트 알림 애니메이션 - [누락된 부분 복구]
         // -------------------------------------------------------
         const alerts = document.querySelectorAll('.flash-messages-container .alert');
         alerts.forEach(alert => {
@@ -175,7 +175,7 @@
         });
 
         // -------------------------------------------------------
-        // 3. 출퇴근 버튼 AJAX 처리
+        // 3. 출퇴근 버튼 AJAX 처리 (기존 로직 유지)
         // -------------------------------------------------------
         const clockForm = document.querySelector('#clock-form');
         const clockBtn = document.querySelector('.attendance-section .attendance-btn');

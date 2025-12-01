@@ -11,6 +11,7 @@ import calendar
 from dateutil.relativedelta import relativedelta
 import math
 import uuid
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -23,6 +24,30 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # ----------------------------------------------------
 # 0. 헬퍼 함수 및 필터 (계산 및 포맷팅)
 # ----------------------------------------------------
+def get_real_weather():
+    API_KEY = "d5d02c8ce25a904d5dd64a317fba7f14" 
+    
+    # ✅ [수정] 우리 회사 좌표 (예: 강남역 부근)
+    # 구글 지도에서 복사한 값을 여기에 넣으세요.
+    LAT = "37.584649"  
+    LON = "126.925693" 
+    
+    # ✅ [수정] 쿼리 변경: q={CITY} -> lat={LAT}&lon={LON}
+    URL = f"http://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=kr"
+
+    try:
+        response = requests.get(URL, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                "temp": round(data["main"]["temp"]),
+                "desc": data["weather"][0]["description"],
+                "icon": data["weather"][0]["icon"],
+                # "city": data["name"] # API가 주는 동네 이름은 영어거나 부정확할 수 있음
+            }
+        return None
+    except:
+        return None
 
 def get_most_recent_weekday(date_obj):
     """주말(토/일)인 경우, 가장 최근의 금요일 날짜를 반환합니다."""
@@ -296,7 +321,7 @@ def admin_required(view):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if g.user: return redirect(url_for('hr_management'))
+    if g.user: return redirect(url_for('dashboard'))
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -310,7 +335,7 @@ def login():
         if user_record and check_password_hash(user_record['password_hash'], password):
             session['user_id'] = user_record['employee_id'] 
             flash(f"환영합니다, {user_record['username']}님!", "success")
-            return redirect(url_for('hr_management'))
+            return redirect(url_for('dashboard'))
         else:
             flash("ID 또는 비밀번호가 올바르지 않습니다.", "error")
     return render_template('login.html')
@@ -321,10 +346,89 @@ def logout():
     flash("로그아웃되었습니다.", "success")
     return redirect(url_for('login'))
 
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # 1. 전체 직원 수
+    total_employees_count = cursor.execute("SELECT COUNT(*) FROM employees WHERE id != 'admin'").fetchone()[0]
+    
+    # 2. 근무 현황 통계 & 부재자 리스트
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    cursor.execute("""
+        SELECT e.id, e.name, e.department, e.position,
+               COALESCE(a.attendance_status, '부재') as status,
+               a.clock_in_time, a.clock_out_time
+        FROM employees e
+        LEFT JOIN attendance a ON e.id = a.employee_id AND a.record_date = ?
+        WHERE e.id != 'admin' AND e.status = '재직'
+    """, (today_str,))
+    employees_status = cursor.fetchall()
+    
+    status_counts = {'재실': 0, '휴가': 0, '외근/출장': 0, '부재': 0}
+    absent_list = []
+
+    for emp in employees_status:
+        s = emp['status']
+        if emp['clock_in_time'] and not emp['clock_out_time']: s = '재실'
+        elif s in ['정상', '지각']: s = '재실'
+            
+        if s == '재실': status_counts['재실'] += 1
+        elif s == '휴가': status_counts['휴가'] += 1
+        elif s in ['외근', '출장']: status_counts['외근/출장'] += 1
+        else: status_counts['부재'] += 1
+        
+        if s != '재실':
+            badge_color = '#e74c3c' # 기본 레드
+            if s == '휴가': badge_color = '#3498db'
+            elif s in ['외근', '출장']: badge_color = '#f39c12'
+            
+            absent_list.append({
+                'name': emp['name'], 'department': emp['department'], 'status': s, 'color': badge_color
+            })
+
+    # 3. 공지사항
+    notices = cursor.execute("SELECT * FROM notices ORDER BY created_at DESC LIMIT 5").fetchall()
+    
+    # 4. 부서별 차트
+    dept_stats = cursor.execute("SELECT department, COUNT(*) as count FROM employees WHERE status='재직' AND id!='admin' GROUP BY department ORDER BY count DESC").fetchall()
+    dept_labels = [row['department'] for row in dept_stats]
+    dept_counts = [row['count'] for row in dept_stats]
+    
+    # 5. 급여 정보 (본인)
+    employee_id = g.user['id']
+    cursor.execute("SELECT base_salary FROM salary_contracts WHERE employee_id = ?", (employee_id,))
+    contract = cursor.fetchone()
+    base_salary = contract['base_salary'] if contract else 0
+
+    cursor.execute("SELECT net_salary, payment_month FROM salary_payments WHERE employee_id = ? ORDER BY payment_year DESC, payment_month DESC LIMIT 1", (employee_id,))
+    payment = cursor.fetchone()
+    last_net_salary = payment['net_salary'] if payment else 0
+    last_payment_month = payment['payment_month'] if payment else 0
+    
+    conn.close()
+
+    # ✅ [핵심] 날씨 데이터 가져오기 (상단에 정의한 함수 호출)
+    weather_data = get_real_weather() 
+    
+    return render_template('dashboard.html', 
+                           total_employees_count=total_employees_count,
+                           status_counts=status_counts,
+                           absent_list=absent_list,
+                           notices=notices,
+                           dept_labels=dept_labels,
+                           dept_counts=dept_counts,
+                           base_salary=base_salary,
+                           last_net_salary=last_net_salary,
+                           last_payment_month=last_payment_month,
+                           weather=weather_data) # ✅ 템플릿으로 전달
 @app.route('/')
 @login_required
 def root():
-    return redirect(url_for('hr_management'))
+    return redirect(url_for('dashboard')) # 기존: hr_management
 
 @app.route('/change_password', methods=['GET', 'POST'])
 @login_required
