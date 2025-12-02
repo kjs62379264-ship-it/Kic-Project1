@@ -109,6 +109,97 @@ def calculate_work_duration(clock_in_str, clock_out_str, lunch_minutes=60):
     if working_seconds < 0: working_seconds = 0
     return f"{int(working_seconds // 3600)}h {int((working_seconds % 3600) // 60)}m"
 
+def calculate_monthly_stats(employee_id, year, month):
+    """이번 달의 지각, 연장(주말포함), 야간 근무 시간을 계산"""
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    start_date = f"{year}-{month:02d}-01"
+    # 다음 달 1일 계산
+    if month == 12: next_month = f"{year+1}-01-01"
+    else: next_month = f"{year}-{month+1:02d}-01"
+        
+    # 이번 달 기록 조회
+    cursor.execute("""
+        SELECT record_date, clock_in_time, clock_out_time, attendance_status
+        FROM attendance 
+        WHERE employee_id = ? 
+          AND record_date >= ? AND record_date < ?
+    """, (employee_id, start_date, next_month))
+    
+    records = cursor.fetchall()
+    conn.close()
+    
+    late_count = 0
+    extended_seconds = 0 # 연장+휴일 (1.5배 구간)
+    night_seconds = 0    # 야간 (0.5배 가산 구간, 즉 22시 이후)
+
+    for row in records:
+        if row['attendance_status'] == '지각':
+            late_count += 1
+            
+        if not row['clock_out_time'] or not row['clock_in_time']:
+            continue
+
+        try:
+            # 날짜/시간 파싱
+            r_date = datetime.strptime(row['record_date'], '%Y-%m-%d').date()
+            t_in = row['clock_in_time']
+            t_out = row['clock_out_time']
+            
+            # 초 단위 유무 처리
+            fmt_in = '%H:%M:%S' if len(t_in) >= 8 else '%H:%M'
+            fmt_out = '%H:%M:%S' if len(t_out) >= 8 else '%H:%M'
+            
+            in_dt = datetime.combine(r_date, datetime.strptime(t_in, fmt_in).time())
+            out_dt = datetime.combine(r_date, datetime.strptime(t_out, fmt_out).time())
+            
+            if out_dt < in_dt: out_dt += timedelta(days=1) # 자정 넘김
+            
+            is_weekend = r_date.weekday() >= 5 # 토, 일
+            
+            # 기준 시간
+            standard_start = in_dt.replace(hour=9, minute=0, second=0)
+            standard_end = in_dt.replace(hour=18, minute=0, second=0)
+            night_start = in_dt.replace(hour=22, minute=0, second=0)
+            
+            # 퇴근이 야간(22:00)을 넘긴 경우 -> 야간 시간 누적
+            if out_dt > night_start:
+                night_seconds += (out_dt - night_start).total_seconds()
+                # 연장 계산을 위해 퇴근 시간을 22:00로 캡(Cap) 씌움 (야간은 별도니까)
+                calc_end = night_start
+            else:
+                calc_end = out_dt
+                
+            # 연장/휴일 근무 계산 (1.5배 구간)
+            if is_weekend:
+                # 주말: 출근부터 22시(혹은 퇴근)까지 전부 연장(특근)
+                if calc_end > in_dt:
+                    extended_seconds += (calc_end - in_dt).total_seconds()
+            else:
+                # 평일: 18시부터 22시(혹은 퇴근)까지 연장
+                if calc_end > standard_end:
+                    # 18시 이전에 출근했어도 18시부터 계산
+                    start_calc = max(in_dt, standard_end)
+                    if calc_end > start_calc:
+                        extended_seconds += (calc_end - start_calc).total_seconds()
+                        
+        except:
+            continue
+
+    # 초 -> 시간:분 변환
+    def sec_to_hm(sec):
+        h = int(sec // 3600)
+        m = int((sec % 3600) // 60)
+        return f"{h}h {m}m"
+
+    return {
+        'late_count': late_count,
+        'extended_str': sec_to_hm(extended_seconds),
+        'night_str': sec_to_hm(night_seconds)
+    }
+
 def create_attendance_calendar(year, month, records):
     """달력 HTML 생성 함수"""
     attendance_map = {}
@@ -151,57 +242,106 @@ def create_attendance_calendar(year, month, records):
 # ✨ [신규] 초과 근무(야근) 수당 계산 함수
 def calculate_overtime_pay(employee_id, year, month, base_salary):
     """
-    해당 월의 18:00 이후 근무 시간을 계산하여 야근 수당 산출
-    (통상임금 기준 1.5배 가산)
+    [수당 계산 로직]
+    1. 시급 환산: 월 기본급 / 209
+    2. 평일: 18:00 ~ 22:00 (1.5배), 22:00 ~ 06:00 (2.0배)
+    3. 주말: 09:00 ~ 22:00 (1.5배), 22:00 ~ 06:00 (2.0배) - 하루 종일 수당 처리
     """
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 해당 월의 검색 범위 설정
     start_date = f"{year}-{month:02d}-01"
     if month == 12:
         next_month = f"{year+1}-01-01"
     else:
         next_month = f"{year}-{month+1:02d}-01"
         
+    # ✅ [수정] 출근 시간(clock_in_time)과 날짜(record_date)도 필요함
     cursor.execute("""
-        SELECT clock_out_time FROM attendance 
+        SELECT record_date, clock_in_time, clock_out_time 
+        FROM attendance 
         WHERE employee_id = ? 
           AND record_date >= ? AND record_date < ?
           AND clock_out_time IS NOT NULL
+          AND clock_in_time IS NOT NULL
     """, (employee_id, start_date, next_month))
     
     records = cursor.fetchall()
     conn.close()
     
-    total_overtime_seconds = 0
+    # 1. 통상 시급 계산
+    hourly_rate = base_salary / 209
+    
+    total_overtime_pay = 0
+    total_overtime_hours = 0
     
     for row in records:
         try:
-            out_time = datetime.strptime(row['clock_out_time'], '%H:%M:%S')
-        except ValueError:
-            try:
-                out_time = datetime.strptime(row['clock_out_time'], '%H:%M')
-            except:
-                continue
-                
-        # 18:00 (오후 6시) 기준 설정
-        standard_end = out_time.replace(hour=18, minute=0, second=0, microsecond=0)
-        
-        # 18시 이후 퇴근인 경우에만 계산
-        if out_time > standard_end:
-            diff = out_time - standard_end
-            total_overtime_seconds += diff.total_seconds()
+            # 날짜 및 시간 파싱
+            r_date = datetime.strptime(row['record_date'], '%Y-%m-%d').date()
             
-    total_overtime_hours = total_overtime_seconds / 3600
-    
-    # 시급 계산 (통상임금 산정 기준 시간 209시간 가정)
-    hourly_rate = base_salary / 209
-    
-    # 야근 수당 = 시급 * 1.5 * 야근시간
-    overtime_pay = int(hourly_rate * 1.5 * total_overtime_hours)
-    
-    return overtime_pay, round(total_overtime_hours, 1)
+            # 시간 파싱 (초 단위 유무 대응)
+            t_in = row['clock_in_time']
+            t_out = row['clock_out_time']
+            in_time = datetime.strptime(t_in[:8], '%H:%M:%S') if len(t_in) >= 8 else datetime.strptime(t_in[:5], '%H:%M')
+            out_time = datetime.strptime(t_out[:8], '%H:%M:%S') if len(t_out) >= 8 else datetime.strptime(t_out[:5], '%H:%M')
+            
+            # 날짜 정보를 시간에 결합 (주말 계산 및 자정 넘김 처리를 위해)
+            in_dt = datetime.combine(r_date, in_time.time())
+            out_dt = datetime.combine(r_date, out_time.time())
+            
+            # 퇴근 시간이 출근보다 빠르면(자정 넘김), 하루 더함
+            if out_dt < in_dt:
+                out_dt += timedelta(days=1)
+                
+        except:
+            continue
+            
+        # 주말 여부 확인 (0:월 ~ 4:금, 5:토, 6:일)
+        is_weekend = r_date.weekday() >= 5
+        
+        # 기준 시간 설정
+        # 평일은 18:00부터 계산, 주말은 출근시간(in_dt)부터 계산
+        calc_start = in_dt if is_weekend else in_dt.replace(hour=18, minute=0, second=0)
+        
+        # 퇴근이 계산 시작 시간보다 빠르면(예: 평일 17시 퇴근) 패스
+        if out_dt <= calc_start:
+            continue
+            
+        # 실제 계산 시작 시간 (출근이 18시보다 늦으면 출근시간부터)
+        current = max(in_dt, calc_start)
+        
+        # -------------------------------------------------
+        # 시간대별 누적 계산 (1시간 단위 아님, 초 단위 정밀 계산)
+        # -------------------------------------------------
+        # 야간(22:00) 기준 설정
+        night_start = in_dt.replace(hour=22, minute=0, second=0)
+        
+        # 1. [주간/연장 구간] (~ 22:00 까지)
+        if current < night_start:
+            # 퇴근이 22시 전이면 퇴근까지, 넘으면 22시까지
+            end_normal = min(out_dt, night_start)
+            duration = (end_normal - current).total_seconds() / 3600
+            
+            # 평일 18시~, 주말 전시간 -> 1.5배
+            total_overtime_pay += duration * hourly_rate * 1.5
+            total_overtime_hours += duration
+            
+            # 포인터를 22시로 이동
+            current = night_start
+            
+        # 2. [야간 구간] (22:00 ~ 퇴근)
+        if out_dt > night_start:
+            # 이미 current는 night_start 이상임
+            duration = (out_dt - current).total_seconds() / 3600
+            
+            # 평일/주말 상관없이 밤 10시 넘으면 -> 2.0배 (연장 1.5 + 야간 0.5)
+            total_overtime_pay += duration * hourly_rate * 2.0
+            total_overtime_hours += duration
+            
+    return int(total_overtime_pay), round(total_overtime_hours, 1)
 
 
 @app.template_filter('comma')
@@ -409,6 +549,26 @@ def dashboard():
     last_net_salary = payment['net_salary'] if payment else 0
     last_payment_month = payment['payment_month'] if payment else 0
     
+    #6. 미니 캘린더 및 행사 데이터
+    
+    now = datetime.now()
+    current_year = now.year
+    current_month = now.month
+    
+    # 이번 달 달력 매트릭스 생성 (주 단위 리스트의 리스트)
+    # 예: [[0, 0, 1, 2, 3, 4, 5], [6, 7, ...], ...]
+    cal = calendar.Calendar(firstweekday=6) # 6 = 일요일부터 시작
+    month_calendar = cal.monthdayscalendar(current_year, current_month)
+    
+    # 행사 데이터 (DB에서 가져오거나 하드코딩)
+    # 날짜(day)를 키(key)로 하고 행사명(value)을 저장
+    events = {
+        25: "월급날 💰",
+        15: "가정의 날 👨‍👩‍👧‍👦",
+        # 오늘 날짜에 예시 이벤트 추가
+        now.day: "오늘 (Today)" 
+    }
+
     conn.close()
 
     # ✅ [핵심] 날씨 데이터 가져오기 (상단에 정의한 함수 호출)
@@ -424,7 +584,11 @@ def dashboard():
                            base_salary=base_salary,
                            last_net_salary=last_net_salary,
                            last_payment_month=last_payment_month,
-                           weather=weather_data) # ✅ 템플릿으로 전달
+                           weather=weather_data,
+                           month_calendar=month_calendar,
+                           events=events,
+                           current_month=current_month,
+                           today_day=now.day) # ✅ 템플릿으로 전달
 @app.route('/')
 @login_required
 def root():
@@ -474,42 +638,99 @@ def inject_attendance_status():
     return dict(attendance_button_state=btn_state)
 
 @app.route('/attendance/clock', methods=['POST'])
-@login_required
+@login_required 
 def clock():
     emp_id = g.user['id']
     now = datetime.now()
-    today_str = now.strftime('%Y-%m-%d')
-    time_str = now.strftime('%H:%M:%S')
     
+    # DB 저장용 및 비교용 변수
+    today_str = now.date().strftime('%Y-%m-%d')
+    current_time_str = now.strftime('%H:%M:%S')
+    display_time_str = now.strftime('%H:%M')
+
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
+
+    # ✅ [핵심 수정 1] 날짜 조건 제거. 
+    # 어제 출근하고 오늘 퇴근하는 경우를 위해 '가장 최근 기록' 1건을 가져옵니다.
+    cursor.execute("""
+        SELECT id, clock_in_time, clock_out_time, record_date 
+        FROM attendance 
+        WHERE employee_id = ? 
+        ORDER BY id DESC LIMIT 1
+    """, (emp_id,))
+    last_record = cursor.fetchone()
     
-    cursor.execute("SELECT id, clock_in_time, clock_out_time FROM attendance WHERE employee_id = ? AND record_date = ? ORDER BY id DESC LIMIT 1", (emp_id, today_str))
-    last = cursor.fetchone()
+    # 기준 시간 설정
+    late_cutoff_time = time(9, 0, 0)     # 지각 기준
+    standard_clock_in_str = "09:00:00"   # 정상 출근 기록용
+    night_cutoff_time = time(6, 0, 0)    # 야간 근무 종료 기준 (익일 06:00)
     
     msg = ""
     new_state = ""
-    
+
     try:
-        if last and last['clock_in_time'] and last['clock_out_time'] is None:
-            # 퇴근 처리
-            cursor.execute("UPDATE attendance SET clock_out_time = ? WHERE id = ?", (time_str, last['id']))
-            msg = f"{now.strftime('%H:%M')} 퇴근 처리되었습니다."
+        # ----------------------------------------------------
+        # 1. 퇴근 처리 (Clock-Out)
+        # ----------------------------------------------------
+        # 마지막 기록이 있고, 출근은 찍혔는데 퇴근이 안 찍힌 상태라면
+        if last_record and last_record['clock_in_time'] and last_record['clock_out_time'] is None:
+            
+            final_out_time = current_time_str 
+            
+            # ✅ [핵심 수정 2] 익일 06:00 이후 퇴근 시 시간 조정 로직
+            record_date = datetime.strptime(last_record['record_date'], '%Y-%m-%d').date()
+            
+            # 날짜가 바뀌었고(다음날 등)
+            if now.date() > record_date:
+                # 현재 시간이 06:00 이상이라면 (예: 07:00 퇴근)
+                if now.time() >= night_cutoff_time: 
+                    final_out_time = "06:00:00" # 06:00로 강제 고정
+                    msg = f"익일 06:00 이후 퇴근하여 06:00로 조정 기록되었습니다."
+                else:
+                    # 날짜는 지났지만 06:00 이전 (예: 새벽 4시 퇴근) -> 실제 시간 기록
+                    msg = f"{display_time_str}에 퇴근(야근) 기록되었습니다."
+            else:
+                # 당일 퇴근
+                msg = f"{display_time_str}에 퇴근 기록되었습니다. 오늘 근무를 마쳤습니다."
+
+            cursor.execute("""
+                UPDATE attendance SET clock_out_time = ? 
+                WHERE id = ?
+            """, (final_out_time, last_record['id']))
+            
             new_state = '출근'
+            
+        # ----------------------------------------------------
+        # 2. 출근 처리 (Clock-In)
+        # ----------------------------------------------------
         else:
-            # 출근 처리
-            status = '지각' if now.time() > time(9, 0, 0) else '정상'
-            rec_time = time_str if status == '지각' else "09:00:00"
-            cursor.execute("INSERT INTO attendance (employee_id, record_date, clock_in_time, attendance_status) VALUES (?, ?, ?, ?)", 
-                           (emp_id, today_str, rec_time, status))
-            msg = f"{now.strftime('%H:%M')} 출근 처리되었습니다. ({status})"
+            status = '정상'
+            recorded_time_str = standard_clock_in_str # 기본 09:00:00 저장
+            
+            # 09:00 초과 시 지각 처리 및 실제 시간 기록
+            if now.time() > late_cutoff_time:
+                status = '지각'
+                recorded_time_str = current_time_str 
+                msg = f"경고: {display_time_str}에 지각으로 출근이 기록되었습니다."
+            else:
+                # 09:00 이전 출근
+                msg = f"{display_time_str}에 출근 요청됨 (기록 시간: 09:00)."
+            
+            cursor.execute("""
+                INSERT INTO attendance (employee_id, record_date, clock_in_time, attendance_status)
+                VALUES (?, ?, ?, ?)
+            """, (emp_id, today_str, recorded_time_str, status)) 
+            
             new_state = '퇴근'
+        
         conn.commit()
         return jsonify({'success': True, 'message': msg, 'new_button_state': new_state})
+
     except Exception as e:
         conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': f'서버 오류: {str(e)}'}), 500
     finally:
         conn.close()
 
@@ -612,6 +833,7 @@ def my_attendance():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 1. 날짜 파라미터 처리
     year = request.args.get('year', datetime.now().year, type=int)
     month = request.args.get('month', datetime.now().month, type=int)
     
@@ -619,20 +841,26 @@ def my_attendance():
     last_day = calendar.monthrange(year, month)[1]
     end_date = f"{year}-{month:02d}-{last_day}"
     
-    cursor.execute("""
-        SELECT * FROM attendance 
-        WHERE employee_id = ? AND record_date BETWEEN ? AND ?
-        ORDER BY record_date DESC
-    """, (g.user['id'], start_date, end_date))
+    # 2. 필터링 파라미터 (선택 사항)
+    f_start = request.args.get('start_date')
+    f_end = request.args.get('end_date')
+    f_status = request.args.get('status_filter')
     
+    # 3. 기간 내 근태 기록 조회
+    sql = "SELECT * FROM attendance WHERE employee_id = ? AND record_date BETWEEN ? AND ? ORDER BY record_date DESC"
+    cursor.execute(sql, (g.user['id'], start_date, end_date))
     rows = cursor.fetchall()
+    
     records = []
     calendar_data = []
     
-    late_count = 0
-    
     for row in rows:
         d = dict(row)
+        # 필터링 적용
+        if f_start and d['record_date'] < f_start: continue
+        if f_end and d['record_date'] > f_end: continue
+        if f_status and d['attendance_status'] != f_status: continue
+        
         d['date'] = d['record_date']
         d['clock_in'] = d['clock_in_time'][:5] if d['clock_in_time'] else '-'
         d['clock_out'] = d['clock_out_time'][:5] if d['clock_out_time'] else '-'
@@ -641,14 +869,43 @@ def my_attendance():
         records.append(d)
         
         calendar_data.append({'record_date': datetime.strptime(d['record_date'], '%Y-%m-%d').date(), 'attendance_status': d['status']})
-        if d['status'] == '지각': late_count += 1
 
+    # 4. ✅ [핵심] 통계 계산 함수 호출 (상단에 정의한 함수 사용)
+    stats = calculate_monthly_stats(g.user['id'], year, month)
+    
+    # 템플릿용 통계 데이터 재구성
+    monthly_stats = {
+        'remaining_leave': 12.0,               # (임시) 잔여 연차
+        'late_count': stats['late_count'],     # 지각 횟수
+        'extended_work': stats['extended_str'], # 연장+주말 근무 시간
+        'night_work': stats['night_str']        # 야간 근무 시간
+    }
+    
+    # 5. ✅ [복구] 오늘의 근무 요약 데이터 조회 (이게 없으면 하단 좌측 카드가 비어보임)
+    today_rec = get_today_attendance(g.user['id'])
+    today_status = today_rec['attendance_status'] if today_rec else '미등록'
+    
     cal_html = create_attendance_calendar(year, month, calendar_data)
     conn.close()
     
-    return render_template('my_attendance.html', attendance_records=records, calendar_html=cal_html,
-                           current_year=year, current_month=month, current_month_name=f"{year}년 {month}월",
-                           monthly_stats={'late_count': late_count, 'remaining_leave': 15})
+    return render_template('my_attendance.html', 
+                           attendance_records=records, 
+                           calendar_html=cal_html,
+                           current_year=year, 
+                           current_month=month, 
+                           current_month_name=f"{year}년 {month}월",
+                           
+                           # ✅ [수정] stats 대신 monthly_stats를 전달해야 함!
+                           monthly_stats=monthly_stats, 
+                           
+                           # ✅ [복구] 오늘의 데이터 전달
+                           today_record=today_rec or {}, 
+                           today_status=today_status,
+                           
+                           # 필터 값 유지
+                           start_date_filter=f_start,
+                           end_date_filter=f_end,
+                           status_filter_value=f_status)
 
 @app.route('/vacation_request', methods=['GET', 'POST'])
 @login_required

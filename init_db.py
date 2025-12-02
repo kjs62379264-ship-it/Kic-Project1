@@ -7,9 +7,8 @@ def init_database():
     cursor = conn.cursor()
 
     # ---------------------------------------------------------
-    # 1. 모든 테이블 삭제 (초기화) - 오류 방지를 위해 모두 포함
+    # 1. 모든 테이블 삭제 (초기화) - 참조 관계 역순으로 삭제
     # ---------------------------------------------------------
-    # [핵심] 오류가 발생했던 테이블을 포함하여 모든 테이블을 삭제합니다.
     cursor.execute("DROP TABLE IF EXISTS payroll_rates") 
     cursor.execute("DROP TABLE IF EXISTS salary_payments")
     cursor.execute("DROP TABLE IF EXISTS fixed_deductions")
@@ -24,7 +23,7 @@ def init_database():
     cursor.execute("DROP TABLE IF EXISTS positions")
     cursor.execute("DROP TABLE IF EXISTS departments")
     
-    # 혹시 모를 이전 버전의 테이블들도 삭제
+    # 혹시 모를 구버전 테이블 정리
     cursor.execute("DROP TABLE IF EXISTS salary")
     cursor.execute("DROP TABLE IF EXISTS allowances")
     cursor.execute("DROP TABLE IF EXISTS deductions")
@@ -102,7 +101,7 @@ def init_database():
     # 4. 급여 관리 전용 테이블 생성
     # ---------------------------------------------------------
     
-    # (1) 연봉 계약 정보 (기본급 관리)
+    # (1) 연봉 계약 정보
     cursor.execute("""
     CREATE TABLE salary_contracts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -136,7 +135,7 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (4) 급여 지급 기록 테이블 수정
+    # (4) 급여 지급 기록 테이블
     cursor.execute("""
     CREATE TABLE salary_payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,7 +146,7 @@ def init_database():
         
         total_base INTEGER NOT NULL,       -- 기본급
         total_allowance INTEGER NOT NULL,  -- 수당 합계
-        overtime_pay INTEGER DEFAULT 0,    -- ✨ [추가] 초과(야근) 근무 수당
+        overtime_pay INTEGER DEFAULT 0,    -- 야근 수당
         total_deduction INTEGER NOT NULL,  -- 공제 합계
         net_salary INTEGER NOT NULL,       -- 실 수령액
         
@@ -162,17 +161,17 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (5) [추가] 급여 요율 설정 테이블 (이 부분이 빠져 있었습니다!)
+    # (5) 급여 요율 설정 테이블
     cursor.execute("""
     CREATE TABLE payroll_rates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        national_pension_rate REAL DEFAULT 4.5,    -- 국민연금 (4.5%)
-        health_insurance_rate REAL DEFAULT 3.545,  -- 건강보험 (3.545%)
-        care_insurance_rate REAL DEFAULT 12.95,    -- 장기요양 (건강보험의 12.95%)
-        employment_insurance_rate REAL DEFAULT 0.9 -- 고용보험 (0.9%)
+        national_pension_rate REAL DEFAULT 4.5,    
+        health_insurance_rate REAL DEFAULT 3.545,  
+        care_insurance_rate REAL DEFAULT 12.95,    
+        employment_insurance_rate REAL DEFAULT 0.9 
     );""")
     
-    # 기본 요율값 하나 넣어주기 (이게 없으면 조회할 때 또 에러납니다)
+    # 기본 요율 데이터 삽입
     cursor.execute("""
         INSERT INTO payroll_rates (id, national_pension_rate, health_insurance_rate, care_insurance_rate, employment_insurance_rate)
         VALUES (1, 4.5, 3.545, 12.95, 0.9)
@@ -184,13 +183,13 @@ def init_database():
     # 5. 초기 데이터 삽입
     # ---------------------------------------------------------
 
-    # (1) 직원 정보
+    # (1) 직원 정보 (이미지는 기본 default.jpg로 통일하거나 있는 파일명 사용)
     employees_data = [
         ('25HR0001', '홍길동', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
         ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'default.jpg'),
         ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'default.jpg'),
         ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'default.jpg'),
-        ('admin', '관리자', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
+        ('admin', '관리자', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'default.jpg'),
     ]
     cursor.executemany("""
         INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)

@@ -462,8 +462,9 @@ body {
 }
 
 .calendar-table td.future-day {
-    color: #ccc;
-    background-color: #f5f5f5;
+    color: #ccc; /* 글자색은 연하게 유지 (선택 사항) */
+    /* background-color: #f5f5f5;  <-- 이 부분을 삭제하거나 주석 처리하세요! */
+    background-color: #ffffff; /* 또는 흰색으로 강제 지정 */
 }
 /* base.css 또는 hr_styles.css 파일에 추가/수정 */
 
