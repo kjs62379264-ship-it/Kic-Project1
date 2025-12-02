@@ -1198,7 +1198,20 @@ def add_employee():
     if request.method == 'POST':
         try:
             # 1. 프로필 이미지 처리 (기본값 설정)
-        
+            profile_image_filename = 'default.jpg' 
+            
+            if 'profile_image' in request.files:
+                f = request.files['profile_image']
+                if f.filename:
+                    # 확장자 추출 및 UUID 파일명 생성
+                    ext = f.filename.rsplit('.', 1)[1].lower()
+                    new_filename = f"{uuid.uuid4()}.{ext}"
+                    
+                    # 폴더가 없으면 생성 후 저장
+                    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+                        os.makedirs(app.config['UPLOAD_FOLDER'])
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
+                    profile_image_filename = new_filename
 
             # 2. 사번 생성 로직
             dept = request.form['department']
@@ -1212,26 +1225,7 @@ def add_employee():
             seq = int(last[0][-4:]) + 1 if last else 1
             new_id = f"{prefix}{seq:04d}"
             
-            # ✅ [핵심 수정] 이미지 처리 (UUID 사용)
-            profile_image_filename = 'default.jpg' 
-            
-            if 'profile_image' in request.files:
-                f = request.files['profile_image']
-                if f.filename:
-                    # 1. 확장자 추출 (jpg, png 등)
-                    ext = f.filename.rsplit('.', 1)[1].lower()
-                    
-                    # 2. 랜덤한 영문 파일명 생성 (예: a1b2c3d4.jpg) - 한글 문제 해결!
-                    new_filename = f"{uuid.uuid4()}.{ext}"
-                    
-                    # 3. 폴더가 없으면 생성
-                    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-                        os.makedirs(app.config['UPLOAD_FOLDER'])
-                    
-                    # 4. 저장
-                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
-                    profile_image_filename = new_filename
-            # 3. DB 삽입 (profile_image 포함)
+            # 3. 직원 기본 정보(employees) 저장
             cur.execute("""
                 INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
                 VALUES (?,?,?,?,?,?,?,?,?, '재직', ?)
@@ -1240,11 +1234,23 @@ def add_employee():
                   f"{request.form['email_id']}@{request.form['email_domain']}",
                   request.form['address'], request.form['gender'], profile_image_filename))
             
+            # 4. 로그인 정보(users) 저장
             cur.execute("INSERT INTO users (employee_id, username, password_hash, role) VALUES (?,?,?,?)",
                         (new_id, new_id, generate_password_hash(request.form['password']), request.form.get('role', 'user')))
             
+            # ✨ [추가된 부분] 5. 급여/계좌 정보(salary_contracts) 연결 저장
+            # 입력폼에서 은행과 계좌번호를 가져옵니다.
+            bank_name = request.form.get('bank_name', '')
+            account_number = request.form.get('account_number', '')
+            
+            # 연봉/기본급은 아직 모르므로 0원으로 초기화하여 계좌 정보만 우선 저장합니다.
+            cur.execute("""
+                INSERT INTO salary_contracts (employee_id, base_salary, annual_salary, bank_name, account_number)
+                VALUES (?, 0, 0, ?, ?)
+            """, (new_id, bank_name, account_number))
+            
             conn.commit()
-            flash(f"직원 {request.form['name']}({new_id}) 등록 완료", "success")
+            flash(f"직원 {request.form['name']}({new_id}) 등록 및 계좌 연결 완료", "success")
             return redirect(url_for('hr_management'))
 
         except Exception as e:
@@ -1385,11 +1391,12 @@ def salary_payroll():
     year = request.args.get('year', datetime.now().year, type=int)
     month = request.args.get('month', datetime.now().month, type=int)
     
-    # 검색 필터 파라미터 받기
+    # 검색 필터 파라미터 받기 (이름, 부서, 직급)
     search_name = request.args.get('search_name', '')
     search_dept = request.args.get('search_dept', '')
+    search_pos = request.args.get('search_pos', '') # [추가] 직급 검색 파라미터
 
-    # 기본 쿼리 (직급(position) 포함)
+    # 기본 쿼리
     sql = """
         SELECT p.*, e.name, e.department, e.position 
         FROM salary_payments p
@@ -1398,25 +1405,25 @@ def salary_payroll():
     """
     params = [year, month]
 
-    # 필터링 조건 추가
+    # [수정] 필터링 조건 추가 (직급 포함)
     if search_name:
         sql += " AND e.name LIKE ?"
         params.append(f"%{search_name}%")
     if search_dept:
         sql += " AND e.department = ?"
         params.append(search_dept)
+    if search_pos: # [추가] 직급 조건
+        sql += " AND e.position = ?"
+        params.append(search_pos)
     
     sql += " ORDER BY e.id ASC"
 
     cur.execute(sql, params)
     
-    # ✨ [핵심 수정] Row 객체를 dict로 변환하여 리스트로 저장
-    # (이 부분이 없으면 |tojson 에러가 발생합니다)
     existing_payroll = [dict(row) for row in cur.fetchall()]
-    
     is_calculated = len(existing_payroll) > 0
     
-    # [핵심] 총 합계 계산 (화면 하단 표시용)
+    # 총 합계 계산
     grand_total = {
         'base': 0, 'allowance': 0, 'overtime': 0, 
         'total_pay': 0, 'deduction': 0, 'net': 0
@@ -1425,15 +1432,17 @@ def salary_payroll():
     for p in existing_payroll:
         grand_total['base'] += p['total_base']
         grand_total['allowance'] += p['total_allowance']
-        grand_total['overtime'] += p['overtime_pay']
-        # 지급 총액 = 기본급 + 수당 + 야근수당
-        grand_total['total_pay'] += (p['total_base'] + p['total_allowance'] + p['overtime_pay'])
+        grand_total['overtime'] += p.get('overtime_pay', 0) # 안전하게 get 사용
+        grand_total['total_pay'] += (p['total_base'] + p['total_allowance'] + p.get('overtime_pay', 0))
         grand_total['deduction'] += p['total_deduction']
         grand_total['net'] += p['net_salary']
 
-    # 부서 목록 가져오기 (검색 드롭다운용)
+    # 검색 드롭다운용 목록 가져오기
     cur.execute("SELECT name FROM departments")
     departments = [row['name'] for row in cur.fetchall()]
+    
+    cur.execute("SELECT name FROM positions") # [추가] 직급 목록 가져오기
+    positions = [row['name'] for row in cur.fetchall()]
     
     conn.close()
     
@@ -1443,8 +1452,10 @@ def salary_payroll():
                            is_calculated=is_calculated,
                            grand_total=grand_total,
                            departments=departments,
+                           positions=positions, # [추가] 템플릿 전달
                            search_name=search_name,
-                           search_dept=search_dept)
+                           search_dept=search_dept,
+                           search_pos=search_pos) # [추가] 현재 검색어 전달
 
 # [신규 추가] 재직증명서 출력 라우트
 @app.route('/hr/certificate/<employee_id>')
@@ -1818,15 +1829,89 @@ def my_salary():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    cur.execute("SELECT * FROM salary_payments WHERE employee_id = ? ORDER BY payment_year DESC, payment_month DESC LIMIT 1", (g.user['id'],))
-    last_pay = cur.fetchone()
-    cur.execute("SELECT * FROM salary_payments WHERE employee_id = ? ORDER BY payment_year DESC, payment_month DESC", (g.user['id'],))
+    user_id = g.user['id']
+    
+    # ---------------------------------------------------------
+    # 1. 입사일 기준 조회 가능한 날짜 리스트 생성 (입사월 ~ 현재)
+    # ---------------------------------------------------------
+    try:
+        # DB의 hire_date 문자열(YYYY-MM-DD)을 날짜 객체로 변환
+        hire_date = datetime.strptime(g.user['hire_date'], '%Y-%m-%d')
+    except:
+        # 입사일 오류 시 현재 날짜를 기준으로 처리 (방어 코드)
+        hire_date = datetime.now()
+
+    today = datetime.now()
+    available_periods = []
+
+    # 입사일의 '월' 1일부터 시작 ~ 현재 날짜의 '월' 1일까지 반복
+    # 예: 24년 3월 입사 -> 24-3, 24-4, ... 25-12
+    curr = hire_date.replace(day=1)
+    end = today.replace(day=1)
+
+    while curr <= end:
+        available_periods.append((curr.year, curr.month))
+        curr += relativedelta(months=1)
+
+    # 최신 날짜가 위로 오도록 정렬 (내림차순)
+    available_periods.reverse()
+
+    # ---------------------------------------------------------
+    # 2. 사용자가 선택한 날짜 처리 (Dropdown 값)
+    # ---------------------------------------------------------
+    selected_year = None
+    selected_month = None
+    
+    # HTML form에서 name="period"로 넘겨준 값 (예: "2024-5") 받기
+    period = request.args.get('period') 
+    
+    if period:
+        try:
+            y_str, m_str = period.split('-')
+            selected_year = int(y_str)
+            selected_month = int(m_str)
+        except:
+            pass # 파싱 에러 시 무시
+
+    # 선택값이 없거나(처음 접속), 잘못된 값이면 -> "가장 최신 날짜"로 자동 설정
+    if not selected_year or not selected_month:
+        if available_periods:
+            selected_year, selected_month = available_periods[0]
+        else:
+            selected_year, selected_month = today.year, today.month
+
+    # ---------------------------------------------------------
+    # 3. DB 조회
+    # ---------------------------------------------------------
+    
+    # (1) 선택된 연/월의 급여 정보 (단건 조회)
+    cur.execute("""
+        SELECT * FROM salary_payments
+        WHERE employee_id = ? AND payment_year = ? AND payment_month = ?
+    """, (user_id, selected_year, selected_month))
+    payment = cur.fetchone() 
+
+    # (2) 전체 급여 이력 조회 (하단 리스트용 - 그대로 유지)
+    cur.execute("""
+        SELECT * FROM salary_payments
+        WHERE employee_id = ?
+        ORDER BY payment_year DESC, payment_month DESC
+    """, (user_id,))
     history = cur.fetchall()
-    cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (g.user['id'],))
+
+    # (3) 계좌 정보 조회
+    cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (user_id,))
     account = cur.fetchone()
+
     conn.close()
     
-    return render_template('my_salary.html', payment=last_pay, history=history, account=account)
+    return render_template('my_salary.html', 
+                           payment=payment, 
+                           history=history, 
+                           account=account,
+                           available_periods=available_periods, # [핵심] 날짜 리스트 전달
+                           selected_year=selected_year,         # [핵심] 현재 보여주는 연도
+                           selected_month=selected_month)       # [핵심] 현재 보여주는 월
 
 @app.route('/salary/print/<int:payment_id>')
 @login_required

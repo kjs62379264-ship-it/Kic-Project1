@@ -35,19 +35,38 @@
 
 <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
     <div class="card-header">
-        <span>📄 이번 달 급여 명세서 ({{ payment.payment_month if payment else '-' }}월)</span>
-        {% if payment %}
-        <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em; margin-left: auto;">
-            🖨️ 명세서 인쇄
-        </a>
-        {% endif %}
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            
+            <span style="font-size: 1.1em; font-weight: bold;">
+                📄 {{ selected_year }}년 {{ selected_month }}월 급여 명세서
+            </span>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <form method="GET" action="{{ url_for('my_salary') }}" style="margin: 0;">
+                    <select name="period" onchange="this.form.submit()" 
+                            style="padding: 5px 10px; border-radius: 5px; border: 1px solid #ccc; cursor: pointer; font-size: 0.9em;">
+                        {% for y, m in available_periods %}
+                            <option value="{{ y }}-{{ m }}" {% if y == selected_year and m == selected_month %}selected{% endif %}>
+                                {{ y }}년 {{ m }}월
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+
+                {% if payment %}
+                <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em;">
+                    🖨️ 인쇄
+                </a>
+                {% endif %}
+            </div>
+        </div>
     </div>
     
     <div class="card-body" style="display: flex; flex-direction: column;">
         {% if payment %}
         <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
             <div><strong>지급일:</strong> {{ payment.payment_date }}</div>
-            <div><strong>지급계좌:</strong> {{ account.bank_name }} {{ account.account_number }}</div>
+            <div><strong>지급계좌:</strong> {{ account.bank_name if account else '-' }} {{ account.account_number if account else '-' }}</div>
         </div>
         
         <table class="employee-table" style="width: 100%;">
@@ -97,15 +116,16 @@
             <h2 style="margin: 0; color: #27ae60; font-size: 2em;">실 수령액: {{ payment.net_salary|comma }} 원</h2>
         </div>
         {% else %}
-        <p style="text-align: center; padding: 30px; color: #7f8c8d; margin: auto;">
-            이번 달 확정된 급여 내역이 없습니다.
-        </p>
+        <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #7f8c8d;">
+            <p style="font-size: 1.2em; margin-bottom: 10px;">📉 해당 월의 급여 내역이 없습니다.</p>
+            <p style="font-size: 0.9em;">(급여 정산이 아직 완료되지 않았거나 데이터가 없습니다)</p>
+        </div>
         {% endif %}
     </div>
 </div>
 
 <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
-    <div class="card-header">📜 최근 급여 이력</div>
+    <div class="card-header">📜 전체 급여 이력 (최신순)</div>
     
     <div class="card-body">
         <table class="employee-table">
@@ -119,7 +139,7 @@
             </thead>
             <tbody>
             {% for h in history %}
-                <tr>
+                <tr style="{% if h.payment_year == selected_year and h.payment_month == selected_month %}background-color: #fff9c4;{% endif %}">
                     <td>{{ h.payment_year }}.{{ h.payment_month }}</td>
                     <td>{{ (h.total_base + h.total_allowance + (h.overtime_pay|default(0)))|comma }}</td>
                     <td style="font-weight: bold;">{{ h.net_salary|comma }}</td>

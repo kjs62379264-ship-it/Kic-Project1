@@ -34,20 +34,30 @@
         </div>
 
         <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
-            <form method="GET" action="{{ url_for('salary_payroll') }}" style="display: flex; gap: 15px; align-items: center;">
+            <form method="GET" action="{{ url_for('salary_payroll') }}" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="hidden" name="year" value="{{ year }}">
                 <input type="hidden" name="month" value="{{ month }}">
                 
-                <span>🔍 검색: </span>
-                <select name="search_dept" style="padding: 6px;">
+                <span style="font-weight: bold; color: #555;">🔍 검색 조건: </span>
+                
+                <select name="search_dept" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
                     <option value="">-- 부서 전체 --</option>
                     {% for dept in departments %}
                     <option value="{{ dept }}" {% if search_dept == dept %}selected{% endif %}>{{ dept }}</option>
                     {% endfor %}
                 </select>
-                <input type="text" name="search_name" placeholder="이름 검색" value="{{ search_name }}" style="padding: 6px;">
+
+                <select name="search_pos" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                    <option value="">-- 직급 전체 --</option>
+                    {% for pos in positions %}
+                    <option value="{{ pos }}" {% if search_pos == pos %}selected{% endif %}>{{ pos }}</option>
+                    {% endfor %}
+                </select>
+
+                <input type="text" name="search_name" placeholder="이름 검색" value="{{ search_name }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                
                 <button type="submit" class="btn sub-action-btn" style="padding: 6px 15px;">검색 적용</button>
-                <a href="{{ url_for('salary_payroll', year=year, month=month) }}" class="btn sub-action-btn" style="background-color: #95a5a6;">초기화</a>
+                <a href="{{ url_for('salary_payroll', year=year, month=month) }}" class="btn sub-action-btn" style="background-color: #95a5a6; color: white; text-decoration: none;">초기화</a>
             </form>
         </div>
     </div>
@@ -76,7 +86,7 @@
                     <td style="font-weight: bold;">{{ pay.position }}</td>
                     
                     <td style="text-align: right;">
-                        {{ (pay.total_base + pay.total_allowance + pay.overtime_pay)|comma }}
+                        {{ (pay.total_base + pay.total_allowance + (pay.overtime_pay or 0))|comma }}
                     </td>
                     
                     <td style="text-align: right; color: #e74c3c;">
@@ -95,7 +105,7 @@
                     </td>
                 </tr>
             {% else %}
-                <tr><td colspan="8" style="text-align:center; padding: 30px;">데이터가 없습니다.</td></tr>
+                <tr><td colspan="8" style="text-align:center; padding: 30px; color: #7f8c8d;">검색 결과가 없습니다.</td></tr>
             {% endfor %}
             </tbody>
             
@@ -161,17 +171,18 @@
         document.getElementById('modalName').innerText = data.name + " " + data.position;
         
         // 지급
+        const overtime = data.overtime_pay || 0;
         document.getElementById('modalBase').innerText = formatNumber(data.total_base);
         document.getElementById('modalAllow').innerText = formatNumber(data.total_allowance);
-        document.getElementById('modalOver').innerText = formatNumber(data.overtime_pay);
-        document.getElementById('modalTotalPay').innerText = formatNumber(data.total_base + data.total_allowance + data.overtime_pay);
+        document.getElementById('modalOver').innerText = formatNumber(overtime);
+        document.getElementById('modalTotalPay').innerText = formatNumber(data.total_base + data.total_allowance + overtime);
         
         // 공제
         document.getElementById('modalPension').innerText = formatNumber(data.national_pension);
         document.getElementById('modalHealth').innerText = formatNumber(data.health_insurance);
         document.getElementById('modalCare').innerText = formatNumber(data.care_insurance);
         document.getElementById('modalEmpIns').innerText = formatNumber(data.employment_insurance);
-        document.getElementById('modalTax').innerText = formatNumber(data.income_tax + data.local_tax); // 소득세+지방세 합산 표시
+        document.getElementById('modalTax').innerText = formatNumber(data.income_tax + data.local_tax); 
         document.getElementById('modalTotalDed').innerText = formatNumber(data.total_deduction);
         
         // 실 수령
