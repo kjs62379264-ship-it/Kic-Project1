@@ -2,34 +2,85 @@
 
 {% block page_title %}인사 관리 - 직원 정보{% endblock %}
 
-{# ✅ [핵심] 이 페이지 전용 스타일 추가 #}
 {% block custom_styles %}
 <style>
-    /* 1. 메인 그리드를 1열 1행으로 만들고 높이를 100%로 고정 */
+    /* 1. 메인 레이아웃: 화면 꽉 채우기 */
     .content-grid {
-        display: flex !important; /* Grid 대신 Flex 사용 (더 확실함) */
-        flex-direction: column !important;
-        height: 100% !important;
-        padding-bottom: 0 !important;
-        overflow: hidden !important;
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: flex; 
+        flex-direction: column;
     }
 
-    /* 2. 직원 명부 카드가 남은 공간을 모두 차지하도록 설정 */
+    /* 2. 직원 명부 카드: 남은 공간 모두 차지 */
     .employee-list-container {
-        flex-grow: 1 !important;
-        height: 100% !important;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; 
         margin-bottom: 0 !important;
-        display: flex !important;
-        flex-direction: column !important;
+    }
+    
+    /* 카드 내부 본문: 평소에는 스크롤 가능 */
+    .employee-list-container .card-body {
+        flex-grow: 1;
+        padding: 0 20px 10px 20px;
+        overflow-y: auto; 
     }
 
-    /* 3. 카드 바디가 내부에서 꽉 차고 스크롤되도록 설정 */
-    .employee-list-container .card-body {
-        flex-grow: 1 !important;
-        height: 100% !important;
-        overflow-y: auto !important;
-        padding: 0 20px 10px 20px !important;
-        max-height: none !important; /* 혹시 모를 max-height 제거 */
+    /* 3. 모달 스타일 (화면 정중앙) */
+    .modal {
+        display: none; 
+        position: fixed; 
+        z-index: 9999; /* 최상위 */
+        left: 0;
+        top: 0;
+        width: 100%; 
+        height: 100%; 
+        background-color: rgba(0,0,0,0.5); /* 반투명 배경 */
+        
+        /* 정중앙 정렬 */
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-content {
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        width: 90%;
+        max-width: 800px;
+        max-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        padding: 0;
+    }
+    
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h3 { margin: 0; font-size: 1.2em; }
+
+    .modal-body {
+        padding: 20px;
+        overflow-y: auto; /* 모달 내부는 스크롤 가능 */
+    }
+    
+    .loader {
+        border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%;
+        width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 50px auto;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* 🔥 [핵심 해결책] 모달이 열렸을 때(.modal-open), 뒤쪽 목록의 스크롤을 강제로 없앰 */
+    body.modal-open .employee-list-container .card-body {
+        overflow-y: hidden !important;
     }
 </style>
 {% endblock %}
@@ -37,7 +88,6 @@
 {% block page_content %}
 
 <div class="card employee-list-container">
-    
     <div class="card-header employee-list-header">
         <div>직원 명부 (총 {{ employee_count }}명)</div>
         <div class="header-actions">
@@ -86,39 +136,97 @@
         </form>
     </div>
     
-    <div class="card-body" style="flex-grow: 1; padding: 0 20px 10px 20px; overflow-y: auto;">
-        
+    <div class="card-body">
         <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
 
         <table class="employee-table" style="margin-top: 0;">
             <thead style="position: sticky; top: 15px; background-color: #f9f9f9; z-index: 5; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
                 <tr>
-                    <th>사번</th>
-                    <th>이름</th>
-                    <th>부서</th>
-                    <th>직급</th>
-                    <th>상세</th> 
+                    <th>사번</th><th>이름</th><th>부서</th><th>직급</th><th>상세</th> 
                 </tr>
             </thead>
             <tbody>
             {% for employee in employees %}
             <tr class="{{ 'resigned' if employee['status'] == '퇴사' else '' }}">
                 <td>{{ employee['id'] }}</td>
-                <td>{{ employee['name'] }}</td>
+                <td><a href="#" onclick="openEmployeeModal('{{ employee.id }}'); return false;" style="color: inherit; text-decoration: none; font-weight: bold;">{{ employee['name'] }}</a></td>
                 <td>{{ employee['department'] }}</td>
                 <td>{{ employee['position'] }}</td>
-                <td>
-                    <a href="{{ url_for('employee_detail', employee_id=employee['id']) }}" class="detail-btn">조회</a>
-                </td> 
+                <td><button class="detail-btn" onclick="openEmployeeModal('{{ employee.id }}')">조회</button></td> 
             </tr>
             {% else %}
-            <tr>
-                <td colspan="5" style="text-align: center; padding: 50px;">등록된 직원이 없습니다.</td>
-            </tr>
+            <tr><td colspan="5" style="text-align: center; padding: 50px;">등록된 직원이 없습니다.</td></tr>
             {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<div id="employeeModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>직원 상세 정보</h3>
+            <span class="close" onclick="closeEmployeeModal()" style="cursor: pointer; font-size: 24px;">&times;</span>
+        </div>
+        <div id="modalContentContainer" class="modal-body">
+            <div id="modalLoader" class="loader"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const empModal = document.getElementById('employeeModal');
+    const modalContent = document.getElementById('modalContentContainer');
+    const modalLoader = document.getElementById('modalLoader');
+
+    function openEmployeeModal(employeeId) {
+        empModal.style.display = "flex"; // 중앙 정렬
+        
+        // ✅ [핵심] body에 'modal-open' 클래스를 붙임 -> CSS에서 목록 스크롤을 숨김
+        document.body.classList.add('modal-open');
+
+        modalContent.innerHTML = ""; 
+        if(modalLoader) {
+             modalContent.appendChild(modalLoader); 
+             modalLoader.style.display = "block";
+        }
+
+        fetch(`/hr/employee/modal/${employeeId}`)
+            .then(response => response.text())
+            .then(html => {
+                if(modalLoader) modalLoader.style.display = "none";
+                modalContent.innerHTML = html;
+                const scripts = modalContent.getElementsByTagName("script");
+                for (let i = 0; i < scripts.length; i++) eval(scripts[i].innerText);
+            })
+            .catch(error => {
+                modalContent.innerHTML = "<p style='text-align:center; padding:20px; color:red;'>오류 발생</p>";
+            });
+    }
+
+    function closeEmployeeModal() {
+        empModal.style.display = "none";
+        // ✅ [핵심] 클래스 제거 -> 목록 스크롤 다시 생김
+        document.body.classList.remove('modal-open');
+    }
+
+    window.onclick = function(event) {
+        if (event.target == empModal) closeEmployeeModal();
+    }
+    // ✅ [신규 추가] 페이지 로드 시 URL 파라미터를 확인하여 모달 자동 열기
+    document.addEventListener('DOMContentLoaded', function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const openModalId = urlParams.get('open_modal');
+        
+        if (openModalId) {
+            // 해당 직원 ID로 모달 열기 함수 실행
+            openEmployeeModal(openModalId);
+            
+            // (선택 사항) URL에서 파라미터 제거 (새로고침 시 계속 뜨는 것 방지)
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
+    });
+</script>
 
 {% endblock %}

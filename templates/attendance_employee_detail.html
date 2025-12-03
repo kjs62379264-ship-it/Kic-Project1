@@ -3,9 +3,42 @@
 {% block title %}{{ target_user.name }} - 근태 상세 조회{% endblock %}
 {% block page_body_class %}attendance-employee-detail{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* 1. 화면 전체 꽉 채우기 레이아웃 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: grid;
+        grid-template-columns: 1fr;
+        
+        /* ✅ 상단(통계) / 하단(달력) 1:1 비율 고정 */
+        grid-template-rows: 0.92fr 1.08fr; 
+        gap: 20px;
+    }
+
+    /* 2. 카드 높이 100% 강제 */
+    .card {
+        height: 100% !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+    }
+
+    /* 3. 카드 내부 스크롤 활성화 */
+    .card-body {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 20px;
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
 
-<div class="card" style="grid-column: 1 / 3; grid-row: 1 / 2;">
+<div class="card" style="grid-row: 1 / 2;">
     <div class="card-header" style="justify-content: flex-start; gap: 20px;">
         <span style="font-size: 1.1em; font-weight: bold;">
             {{ target_user.name }} ({{ target_user.department }} / {{ target_user.id }})
@@ -17,39 +50,63 @@
     </div>
     
     <div class="card-body">
-        <div class="statistics-container" style="display: flex; gap: 20px;">
+        <div class="statistics-container" style="display: flex; gap: 20px; height: 100%;">
             
-            <div class="monthly-stats" style="flex: 1 1 50%; padding-right: 15px; border-right: 1px solid #eee;">
+            <div class="monthly-stats" style="flex: 1 1 50%; padding-right: 15px; border-right: 1px solid #eee; overflow-y: auto;">
                 <h3 style="margin-top: 0; color: #3498db;">{{ employee_stats_summary.target_month }} 실적</h3>
                 <table class="employee-table stat-table">
-                    <tr><th>지각 일수</th><td>{{ employee_stats_summary.monthly.tardy_count }}회</td></tr>
-                    <tr><th>결근 일수</th><td style="color: #e74c3c;">{{ employee_stats_summary.monthly.absent_count }}일</td></tr>
-                    
+                    <tr>
+                        <th>지각 / 결근</th>
+                        <td>
+                            {{ employee_stats_summary.monthly.tardy_count }}회 / 
+                            <span style="color: #e74c3c;">{{ employee_stats_summary.monthly.absent_count }}회</span>
+                        </td>
+                    </tr>
                     <tr>
                         <th>외근 / 출장 일수</th>
                         <td>{{ employee_stats_summary.monthly.offsite_days }}일 / {{ employee_stats_summary.monthly.business_trip_days }}일</td>
                     </tr>
-                    
-                    <tr><th>휴가 사용</th><td style="font-weight: bold;">{{ employee_stats_summary.monthly.leave_days }}일</td></tr>
-                    <tr style="border-top: 2px solid #ddd;"><th>초과 근무 (시간)</th><td style="color: #2ecc71; font-weight: bold;">{{ employee_stats_summary.monthly.overtime_hours }}</td></tr>
-                    <tr><th>초과 근무 (일수)</th><td>{{ employee_stats_summary.monthly.overtime_days_count }}일</td></tr>
+                    <tr>
+                        <th>초과 근무 (회-시간)</th>
+                        <td style="color: #2ecc71; font-weight: bold;">
+                            {{ employee_stats_summary.monthly.overtime_days_count }}회 - {{ employee_stats_summary.monthly.overtime_hours }}
+                        </td>
+                    </tr>
+                    <tr style="border-top: 2px solid #ddd;">
+                        <th>연차 사용</th>
+                        <td style="font-weight: bold; color: #333;">
+                            {{ employee_stats_summary.monthly.leave_days }}일
+                        </td>
+                    </tr>
                 </table>
             </div>
 
-            <div class="yearly-stats" style="flex: 1 1 50%;">
+            <div class="yearly-stats" style="flex: 1 1 50%; overflow-y: auto;">
                 <h3 style="margin-top: 0; color: #7f8c8d;">{{ employee_stats_summary.target_year }}년 누적</h3>
                  <table class="employee-table stat-table">
-                    <tr><th>지각 일수</th><td>{{ employee_stats_summary.yearly.tardy_count }}회</td></tr>
-                    <tr><th>결근 일수</th><td style="color: #e74c3c;">{{ employee_stats_summary.yearly.absent_count }}일</td></tr>
-                    
+                    <tr>
+                        <th>지각 / 결근</th>
+                        <td>
+                            {{ employee_stats_summary.yearly.tardy_count }}회 / 
+                            <span style="color: #e74c3c;">{{ employee_stats_summary.yearly.absent_count }}회</span>
+                        </td>
+                    </tr>
                     <tr>
                         <th>외근 / 출장 일수</th>
                         <td>{{ employee_stats_summary.yearly.offsite_days }}일 / {{ employee_stats_summary.yearly.business_trip_days }}일</td>
                     </tr>
-                    
-                    <tr><th>휴가 사용</th><td style="font-weight: bold;">{{ employee_stats_summary.yearly.leave_days }}일</td></tr>
-                    <tr style="border-top: 2px solid #ddd;"><th>초과 근무 (시간)</th><td style="color: #2ecc71; font-weight: bold;">{{ employee_stats_summary.yearly.overtime_hours }}</td></tr>
-                    <tr><th>초과 근무 (일수)</th><td>{{ employee_stats_summary.yearly.overtime_days_count }}일</td></tr>
+                    <tr>
+                        <th>초과 근무 (회-시간)</th>
+                        <td style="color: #2ecc71; font-weight: bold;">
+                            {{ employee_stats_summary.yearly.overtime_days_count }}회 - {{ employee_stats_summary.yearly.overtime_hours }}
+                        </td>
+                    </tr>
+                    <tr style="border-top: 2px solid #ddd;">
+                        <th>남은 연차</th>
+                        <td style="font-weight: bold; color: #3498db; font-size: 1.1em;">
+                            {{ employee_stats_summary.yearly.remaining_leave }}일
+                        </td>
+                    </tr>
                 </table>
             </div>
 
@@ -57,7 +114,8 @@
     </div>
 </div>
 
-<div class="card" style="grid-column: 1 / 3; grid-row: 2 / 3; height: 380px;"> 
+
+<div class="card" style="grid-row: 2 / 3;"> 
     <div class="card-header">
         <span style="flex-grow: 1;">🗓️ {{ current_month_name }} 근태 달력</span>
         
@@ -71,7 +129,7 @@
         </button>
     </div>
     
-    <div class="card-body" style="padding: 10px;">
+    <div class="card-body" style="padding: 10px; display: flex; align-items: center; justify-content: center;">
         <div id="attendance-calendar" style="width: 100%;">
             {{ calendar_html | safe }} 
         </div>

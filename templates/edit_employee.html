@@ -2,12 +2,24 @@
 
 {% block page_title %}직원 정보 수정{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* ✅ [핵심] 신규 등록 페이지와 동일한 레이아웃 적용 */
+    .content-grid {
+        grid-template-rows: 100%; /* 행 높이를 화면 전체로 확장 */
+        padding-bottom: 0; /* 하단 여백 제거 */
+        overflow: hidden; /* 전체 스크롤 방지 */
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
-<div class="card" style="grid-column: 1 / 3;">
+
+<div class="card" style="grid-column: 1 / 3; height: 100%; display: flex; flex-direction: column;">
     <div class="card-header">직원 정보 수정 (사번: {{ employee['id'] }})</div>
-    <div class="card-body">
+    
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 20px;">
         
-        {# ✨ [병합] 파일 업로드를 위해 enctype="multipart/form-data" 추가 #}
         <form method="POST" enctype="multipart/form-data">
 
             <div class="form-group">
@@ -17,12 +29,16 @@
 
             <div class="form-group">
                 <label for="profile_image">프로필 사진</label>
+                <input type="hidden" name="current_image" value="{{ employee['profile_image'] }}">
                 <input type="file" id="profile_image" name="profile_image" accept="image/*">
-                {% if employee['profile_image'] %}
-                    <small>현재 사진: {{ employee['profile_image'] }} (새 파일 업로드 시 교체됨)</small>
-                {% else %}
-                    <small>현재 등록된 사진이 없습니다.</small>
-                {% endif %}
+                
+                <div style="margin-top: 10px; display: flex; align-items: center; gap: 10px;">
+                    <img src="{{ url_for('static', filename='profile_photos/' + (employee['profile_image'] or 'default.jpg')) }}" 
+                         style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 1px solid #ccc;">
+                    <span style="color: #7f8c8d; font-size: 0.9em;">
+                        현재: {{ employee['profile_image'] or '없음' }} (파일 선택 시 교체됨)
+                    </span>
+                </div>
             </div>
 
             <div class="form-group">
@@ -36,6 +52,10 @@
                 </select>
             </div>
             <div class="form-group">
+                <label for="birth_date">생년월일</label>
+                <input type="date" id="birth_date" name="birth_date" value="{{ employee['birth_date'] }}" required>
+            </div>
+            <div class="form-group">
                 <label for="position">직급</label>
                 <select id="position" name="position" required>
                     {% for pos in positions %}
@@ -45,10 +65,12 @@
                     {% endfor %}
                 </select>
             </div>
+
             <div class="form-group">
                 <label for="hire_date">입사일</label>
                 <input type="date" id="hire_date" name="hire_date" value="{{ employee['hire_date'] }}" required>
             </div>
+
             <div class="form-group">
                 <label>연락처</label>
                 <div class="phone-group">
@@ -57,6 +79,7 @@
                     <input type="tel" name="phone3" maxlength="4" value="{{ phone_parts[2] }}" required>
                 </div>
             </div>
+
             <div class="form-group">
                 <label>이메일</label>
                 <div class="email-group">
@@ -70,10 +93,32 @@
                     </select>
                 </div>
             </div>
+
             <div class="form-group">
                 <label for="address">주소</label>
                 <input type="text" id="address" name="address" value="{{ employee['address'] }}">
             </div>
+
+            <div class="form-group">
+                <label>급여 계좌 (은행 / 계좌번호)</label>
+                <div style="display: flex; gap: 10px;">
+                    <select name="bank_name" style="width: 130px; flex-shrink: 0; text-align: center; text-align-last: center;">
+                        <option value="" style="text-align: center;">-- 은행 --</option>
+                        {% set current_bank = contract['bank_name'] if contract else '' %}
+                        <option value="국민은행" style="text-align: left; padding-left: 10px;" {% if current_bank == '국민은행' %}selected{% endif %}>국민</option>
+                        <option value="신한은행" style="text-align: left; padding-left: 10px;" {% if current_bank == '신한은행' %}selected{% endif %}>신한</option>
+                        <option value="우리은행" style="text-align: left; padding-left: 10px;" {% if current_bank == '우리은행' %}selected{% endif %}>우리</option>
+                        <option value="하나은행" style="text-align: left; padding-left: 10px;" {% if current_bank == '하나은행' %}selected{% endif %}>하나</option>
+                        <option value="농협" style="text-align: left; padding-left: 10px;" {% if current_bank == '농협' %}selected{% endif %}>농협</option>
+                        <option value="카카오뱅크" style="text-align: left; padding-left: 10px;" {% if current_bank == '카카오뱅크' %}selected{% endif %}>카카오뱅크</option>
+                    </select>
+                    
+                    <input type="text" name="account_number" 
+                           value="{{ contract['account_number'] if contract else '' }}" 
+                           placeholder="계좌번호를 입력하세요 (하이픈 포함)" style="flex-grow: 1;">
+                </div>
+            </div>
+
             <div class="form-group">
                 <label>성별</label>
                 <div class="gender-group">
@@ -84,21 +129,20 @@
 
             {% if g.user.role == 'admin' %}
             <div class="form-group">
-                <label for="role">권한 (역할)</label>
-                <select id="role" name="role" required>
-                    <option value="user" {% if employee['role'] == 'user' %}selected{% endif %}>
-                        일반 사원 (user)
-                    </option>
-                    <option value="admin" {% if employee['role'] == 'admin' %}selected{% endif %}>
-                        관리자 (admin)
-                    </option>
+                <label for="status">재직 상태</label>
+                <select id="status" name="status" required>
+                    <option value="재직" {% if employee['status'] == '재직' %}selected{% endif %}>재직</option>
+                    <option value="퇴사" {% if employee['status'] == '퇴사' %}selected{% endif %}>퇴사</option>
+                    <option value="휴직" {% if employee['status'] == '휴직' %}selected{% endif %}>휴직</option>
                 </select>
             </div>
+            {% else %}
+            <input type="hidden" name="status" value="{{ employee['status'] }}">
             {% endif %}
 
-            <div class="form-actions">
+            <div class="form-actions" style="margin-top: 30px; padding-bottom: 10px;">
                 <button type="submit" class="btn main-action-btn">수정 완료</button>
-                <a href="{{ url_for('hr_management') }}" class="btn sub-action-btn">목록으로</a>
+                <a href="{{ url_for('employee_detail', employee_id=employee['id']) }}" class="btn sub-action-btn">취소</a>
             </div>
         </form>
     </div>

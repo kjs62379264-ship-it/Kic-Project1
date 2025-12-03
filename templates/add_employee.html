@@ -2,18 +2,19 @@
 
 {% block page_title %}신규 직원 등록{% endblock %}
 
-{# ✅ [핵심] 이 페이지 전용 레이아웃 설정 (화면 꽉 채우기) #}
 {% block custom_styles %}
 <style>
+    /* 이 페이지 전용 레이아웃 (화면 꽉 채우기) */
     .content-grid {
-        grid-template-rows: 100%; /* 행 높이를 화면 전체로 확장 */
-        padding-bottom: 0; /* 하단 여백 제거 */
-        overflow: hidden; /* 전체 스크롤 방지 */
+        grid-template-rows: 100%;
+        padding-bottom: 0;
+        overflow: hidden;
     }
 </style>
 {% endblock %}
 
 {% block page_content %}
+
 <div class="card" style="grid-column: 1 / 3; height: 100%; display: flex; flex-direction: column;">
     <div class="card-header">신규 직원 정보 입력</div>
     
@@ -38,6 +39,7 @@
                     {% for dept in departments %}<option value="{{ dept['name'] }}">{{ dept['name'] }}</option>{% endfor %}
                 </select>
             </div>
+
             <div class="form-group">
                 <label for="position">직급</label>
                 <select id="position" name="position" required>
@@ -45,10 +47,17 @@
                     {% for pos in positions %}<option value="{{ pos['name'] }}">{{ pos['name'] }}</option>{% endfor %}
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="birth_date">생년월일</label>
+                <input type="date" id="birth_date" name="birth_date" required>
+            </div>
+
             <div class="form-group">
                 <label for="hire_date">입사일</label>
                 <input type="date" id="hire_date" name="hire_date" required>
             </div>
+
             <div class="form-group">
                 <label>연락처</label>
                 <div class="phone-group">
@@ -57,6 +66,7 @@
                     <input type="tel" name="phone3" maxlength="4" required>
                 </div>
             </div>
+
             <div class="form-group">
                 <label>이메일</label>
                 <div class="email-group">
@@ -66,18 +76,17 @@
                     </select>
                 </div>
             </div>
+
             <div class="form-group">
                 <label for="address">주소</label>
                 <input type="text" id="address" name="address">
             </div>
+
             <div class="form-group">
                 <label>급여 계좌 (은행 / 계좌번호)</label>
                 <div style="display: flex; gap: 10px;">
-                    
                     <select name="bank_name" style="width: 130px; flex-shrink: 0; text-align: center; text-align-last: center;">
-                        
                         <option value="" style="text-align: center;">-- 은행 --</option>
-                        
                         <option value="국민은행" style="text-align: left; padding-left: 10px;">국민</option>
                         <option value="신한은행" style="text-align: left; padding-left: 10px;">신한</option>
                         <option value="우리은행" style="text-align: left; padding-left: 10px;">우리</option>
@@ -85,10 +94,10 @@
                         <option value="농협" style="text-align: left; padding-left: 10px;">농협</option>
                         <option value="카카오뱅크" style="text-align: left; padding-left: 10px;">카카오뱅크</option>
                     </select>
-                    
-                    <input type="text" name="account_number" placeholder="계좌번호를 입력하세요 ( - 포함)" style="flex-grow: 1;">
+                    <input type="text" name="account_number" placeholder="계좌번호를 입력하세요 (하이픈 포함)" style="flex-grow: 1;">
                 </div>
             </div>
+
             <div class="form-group">
                 <label>성별</label>
                 <div class="gender-group">

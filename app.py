@@ -1005,15 +1005,34 @@ def attendance_employee_detail(employee_id):
         conn.close()
         return redirect(url_for('attendance_employee'))
 
+    # 1. 사용자 요청(URL 파라미터)에서 연/월 가져오기
     year = request.args.get('year', datetime.now().year, type=int)
     month = request.args.get('month', datetime.now().month, type=int)
     start_date = date(year, month, 1)
 
+    # 2. 통계 데이터 계산 (남은 연차 등 포함)
+    # (실제 DB 쿼리는 생략하고 로직만 유지합니다. 필요시 calculate_monthly_stats 활용 가능)
+    total_annual_leave = 15.0
+    used_leave_yearly = 0 
+
     employee_stats_summary = {
-        'target_month': datetime.now().strftime('%Y년 %m월'),
-        'target_year': datetime.now().year,
-        'monthly': {'tardy_count': 0, 'absent_count': 0, 'offsite_days': 0, 'business_trip_days': 0, 'leave_days': 0, 'overtime_hours': '0h 0m', 'overtime_days_count': 0},
-        'yearly': {'tardy_count': 0, 'absent_count': 0, 'offsite_days': 0, 'business_trip_days': 0, 'leave_days': 0, 'overtime_hours': '0h 0m', 'overtime_days_count': 0}
+        # ✅ [수정] 현재 시간이 아니라, 선택된 year/month를 사용하도록 변경!
+        'target_month': f"{year}년 {month}월",
+        'target_year': year,
+        
+        'monthly': {
+            'tardy_count': 0, 'absent_count': 0, 
+            'offsite_days': 0, 'business_trip_days': 0, 
+            'leave_days': 0, 
+            'overtime_hours': '0h 0m', 'overtime_days_count': 0
+        },
+        'yearly': {
+            'tardy_count': 0, 'absent_count': 0, 
+            'offsite_days': 0, 'business_trip_days': 0, 
+            'leave_days': used_leave_yearly, 
+            'remaining_leave': total_annual_leave - used_leave_yearly,
+            'overtime_hours': '0h 0m', 'overtime_days_count': 0
+        }
     }
     
     calendar_records = []
@@ -1021,7 +1040,13 @@ def attendance_employee_detail(employee_id):
     
     conn.close()
 
-    return render_template('attendance_employee_detail.html', target_user=target_user, employee_stats_summary=employee_stats_summary, calendar_html=calendar_html, current_year=year, current_month=month, current_month_name=start_date.strftime('%Y년 %m월'))
+    return render_template('attendance_employee_detail.html', 
+                           target_user=target_user, 
+                           employee_stats_summary=employee_stats_summary, 
+                           calendar_html=calendar_html, 
+                           current_year=year, 
+                           current_month=month, 
+                           current_month_name=f"{year}년 {month}월")
 
 @app.route('/attendance_request')
 @login_required
@@ -1227,9 +1252,11 @@ def add_employee():
             
             # 3. 직원 기본 정보(employees) 저장
             cur.execute("""
-                INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
-                VALUES (?,?,?,?,?,?,?,?,?, '재직', ?)
-            """, (new_id, request.form['name'], dept, request.form['position'], request.form['hire_date'],
+                INSERT INTO employees (id, name, department, position, hire_date, birth_date, phone_number, email, address, gender, status, profile_image)
+                VALUES (?,?,?,?,?,?,?,?,?,?, '재직', ?)
+            """, (new_id, request.form['name'], dept, request.form['position'], 
+                  request.form['hire_date'], 
+                  request.form['birth_date'], # 👈 추가됨
                   f"{request.form['phone1']}-{request.form['phone2']}-{request.form['phone3']}",
                   f"{request.form['email_id']}@{request.form['email_domain']}",
                   request.form['address'], request.form['gender'], profile_image_filename))
@@ -1267,17 +1294,6 @@ def add_employee():
     conn.close()
     return render_template('add_employee.html', departments=d, positions=p, email_domains=e)
 
-@app.route('/hr/employee/<employee_id>')
-@login_required
-def employee_detail(employee_id):
-    conn = sqlite3.connect('employees.db')
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM employees WHERE id=?", (employee_id,))
-    emp = cur.fetchone()
-    conn.close()
-    return render_template('employee_detail.html', employee=emp)
-
 @app.route('/hr/edit/<employee_id>', methods=['GET', 'POST'])
 @login_required
 def edit_employee(employee_id):
@@ -1286,37 +1302,82 @@ def edit_employee(employee_id):
     cur = conn.cursor()
     
     if request.method == 'POST':
-        img = request.form.get('current_image') 
-        if 'profile_image' in request.files:
-            f = request.files['profile_image']
-            if f.filename:
-                fname = secure_filename(f.filename)
-                f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
-                img = fname
-        
-        cur.execute("""
-            UPDATE employees SET name=?, department=?, position=?, phone_number=?, email=?, address=?, profile_image=?
-            WHERE id=?
-        """, (request.form['name'], request.form['department'], request.form['position'],
-              f"{request.form['phone1']}-{request.form['phone2']}-{request.form['phone3']}",
-              f"{request.form['email_id']}@{request.form['email_domain']}",
-              request.form['address'], img, employee_id))
-        conn.commit()
-        return redirect(url_for('employee_detail', employee_id=employee_id))
+        try:
+            # 1. 프로필 이미지 처리
+            img = request.form.get('current_image')
+            if 'profile_image' in request.files:
+                f = request.files['profile_image']
+                if f.filename:
+                    ext = f.filename.rsplit('.', 1)[1].lower()
+                    fname = f"{uuid.uuid4()}.{ext}"
+                    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+                        os.makedirs(app.config['UPLOAD_FOLDER'])
+                    f.save(os.path.join(app.config['UPLOAD_FOLDER'], fname))
+                    img = fname
+            
+            # 2. 직원 기본 정보 업데이트 (employees 테이블)
+            cur.execute("""
+                UPDATE employees 
+                SET name=?, department=?, position=?, hire_date=?, birth_date=?, phone_number=?, email=?, address=?, gender=?, status=?, profile_image=? 
+                WHERE id=?
+            """, (
+                request.form['name'], 
+                request.form['department'], 
+                request.form['position'],
+                request.form['hire_date'],
+                request.form['birth_date'], # 👈 추가됨
+                f"{request.form['phone1']}-{request.form['phone2']}-{request.form['phone3']}",
+                f"{request.form['email_id']}@{request.form['email_domain']}",
+                request.form['address'], 
+                request.form['gender'],
+                request.form['status'], 
+                img, 
+                employee_id
+            ))
+            
+            # 3. ✅ [신규] 급여 계좌 정보 업데이트 (salary_contracts 테이블)
+            bank_name = request.form.get('bank_name', '')
+            account_number = request.form.get('account_number', '')
+            
+            # 계약 정보가 있는지 확인
+            cur.execute("SELECT id FROM salary_contracts WHERE employee_id=?", (employee_id,))
+            contract_exist = cur.fetchone()
+            
+            if contract_exist:
+                cur.execute("UPDATE salary_contracts SET bank_name=?, account_number=? WHERE employee_id=?", 
+                            (bank_name, account_number, employee_id))
+            else:
+                # 없으면 새로 생성 (기본급 0원으로)
+                cur.execute("INSERT INTO salary_contracts (employee_id, base_salary, annual_salary, bank_name, account_number) VALUES (?, 0, 0, ?, ?)", 
+                            (employee_id, bank_name, account_number))
 
-    cur.execute("SELECT * FROM employees WHERE id=?", (employee_id,))
-    emp = cur.fetchone()
-    cur.execute("SELECT name FROM departments")
-    depts = cur.fetchall()
-    cur.execute("SELECT name FROM positions")
-    pos = cur.fetchall()
-    cur.execute("SELECT domain FROM email_domains")
-    doms = cur.fetchall()
+            conn.commit()
+            flash("직원 정보가 수정되었습니다.", "success")
+            return redirect(url_for('employee_detail', employee_id=employee_id))
+            
+        except Exception as e:
+            conn.rollback()
+            flash(f"수정 중 오류 발생: {e}", "error")
+
+    # --- GET 요청 처리 ---
+    emp = cur.execute("SELECT * FROM employees WHERE id=?", (employee_id,)).fetchone()
+    
+    # ✅ [신규] 계좌 정보 조회 (수정 폼에 채워 넣기 위함)
+    contract = cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (employee_id,)).fetchone()
+    
+    d = cur.execute("SELECT name FROM departments").fetchall()
+    p = cur.execute("SELECT name FROM positions").fetchall()
+    e = cur.execute("SELECT domain FROM email_domains").fetchall()
     conn.close()
     
+    # 데이터 가공
     phone = emp['phone_number'].split('-') if emp['phone_number'] else ['','','']
     email = emp['email'].split('@') if emp['email'] else ['','']
-    return render_template('edit_employee.html', employee=dict(emp), departments=depts, positions=pos, email_domains=doms,
+    
+    return render_template('edit_employee.html', 
+                           employee=dict(emp), 
+                           contract=contract, # ✅ 템플릿으로 전달
+                           departments=d, positions=p, email_domains=e, 
                            phone_parts=phone, email_parts=email)
 
 @app.route('/hr/print')
@@ -1354,28 +1415,33 @@ def print_employees():
 def process_departure(employee_id):
     conn = sqlite3.connect('employees.db')
     cursor = conn.cursor()
-    try:
-        cursor.execute("UPDATE employees SET status = '퇴사' WHERE id = ?", (employee_id,))
-        cursor.execute("UPDATE users SET role = 'user' WHERE employee_id = ?", (employee_id,)) 
-        conn.commit()
-        flash(f"직원({employee_id})이 퇴사 처리되었습니다.", "success")
-    except Exception as e:
-        conn.rollback()
-        flash(f"오류 발생: {e}", "error")
-    finally:
-        conn.close()
-    return redirect(url_for('employee_detail', employee_id=employee_id))
+    
+    # 퇴사 처리 (권한 강등 포함)
+    cursor.execute("UPDATE employees SET status = '퇴사' WHERE id = ?", (employee_id,))
+    cursor.execute("UPDATE users SET role = 'user' WHERE employee_id = ?", (employee_id,)) 
+    
+    conn.commit()
+    conn.close()
+    flash(f"직원({employee_id})이 퇴사 처리되었습니다.", "success")
+    
+    # ✅ [핵심] 처리가 끝나면 인사 관리 페이지로 돌아가되, 방금 그 직원의 모달을 다시 엽니다.
+    return redirect(url_for('hr_management', open_modal=employee_id))
 
+# ✅ [수정] 재입사 처리
 @app.route('/hr/rehire/<employee_id>', methods=['POST'])
 @admin_required 
 def process_rehire(employee_id):
     conn = sqlite3.connect('employees.db')
     cursor = conn.cursor()
+    
     cursor.execute("UPDATE employees SET status = '재직' WHERE id = ?", (employee_id,))
+    
     conn.commit()
     conn.close()
     flash(f"직원({employee_id})이 재입사 처리되었습니다.", "success")
-    return redirect(url_for('employee_detail', employee_id=employee_id))
+    
+    # ✅ [핵심] 마찬가지로 모달을 다시 엽니다.
+    return redirect(url_for('hr_management', open_modal=employee_id))
 
 # ----------------------------------------------------
 # 5. 급여 관리 (Payroll) 섹션
@@ -2003,12 +2069,71 @@ def settings_management():
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
-    cur.execute("SELECT * FROM departments")
-    d = cur.fetchall()
+    
+    # 1. 활성 부서 조회
+    cur.execute("SELECT * FROM departments WHERE is_active = 1")
+    active_depts = cur.fetchall()
+    
+    # 2. 비활성 부서 조회
+    cur.execute("SELECT * FROM departments WHERE is_active = 0")
+    inactive_depts = cur.fetchall()
+    
+    # 3. 직급 목록 (기존 유지)
     cur.execute("SELECT * FROM positions")
     p = cur.fetchall()
+    
     conn.close()
-    return render_template('settings_management.html', departments=d, positions=p)
+    
+    # active_depts, inactive_depts를 각각 전달
+    return render_template('settings_management.html', 
+                           active_departments=active_depts, 
+                           inactive_departments=inactive_depts, 
+                           positions=p)
+
+@app.route('/hr/settings/toggle_department/<int:dept_id>/<int:status>', methods=['POST'])
+@admin_required
+def toggle_department_status(dept_id, status):
+    """
+    부서 상태 변경 (status: 1=활성, 0=비활성)
+    안전장치: 비활성(0) 시도 시, 해당 부서에 '재직' 중인 직원이 있으면 막음.
+    """
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    
+    try:
+        # ✅ [안전장치 추가] 비활성화(0)를 시도하는 경우 체크
+        if status == 0:
+            # 1. 부서 이름 먼저 조회
+            cursor.execute("SELECT name FROM departments WHERE id = ?", (dept_id,))
+            dept_row = cursor.fetchone()
+            
+            if dept_row:
+                dept_name = dept_row[0]
+                
+                # 2. 해당 부서에 '재직' 중인 직원 수 확인
+                cursor.execute("SELECT COUNT(*) FROM employees WHERE department = ? AND status = '재직'", (dept_name,))
+                emp_count = cursor.fetchone()[0]
+                
+                # 3. 직원이 있으면 거부 (return)
+                if emp_count > 0:
+                    flash(f"⛔ '{dept_name}' 부서에 재직 중인 직원이 {emp_count}명 있습니다. 먼저 부서 이동 처리를 해주세요.", "error")
+                    conn.close()
+                    return redirect(url_for('settings_management'))
+
+        # 이상 없으면 상태 변경 진행
+        cursor.execute("UPDATE departments SET is_active = ? WHERE id = ?", (status, dept_id))
+        conn.commit()
+        
+        msg = "✅ 부서가 활성화되었습니다." if status == 1 else "✅ 부서가 비활성화되었습니다."
+        flash(msg, "success")
+        
+    except Exception as e:
+        conn.rollback()
+        flash(f"오류 발생: {e}", "error")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('settings_management'))
 
 @app.route('/hr/settings/add_department', methods=['POST'])
 @admin_required
@@ -2150,6 +2275,64 @@ def my_page():
                            yearly_stats=yearly_stats,
                            remaining_leave=remaining_leave,
                            tenure_text=tenure_text)
+
+# ==========================================
+# [신규 추가] 직원 상세 정보 모달용 데이터 반환
+# ==========================================
+@app.route('/hr/employee/modal/<employee_id>')
+@login_required
+def get_employee_detail_modal(employee_id):
+    conn = sqlite3.connect('employees.db')
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # 1. 기본 정보 & 급여 계약 정보 조회
+    cursor.execute("""
+        SELECT e.*, s.base_salary, s.annual_salary 
+        FROM employees e
+        LEFT JOIN salary_contracts s ON e.id = s.employee_id
+        WHERE e.id = ?
+    """, (employee_id,))
+    employee = cursor.fetchone()
+
+    if not employee:
+        conn.close()
+        return "직원 정보를 찾을 수 없습니다.", 404
+
+    # 2. 근태 기록 (최근 30일)
+    thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    cursor.execute("""
+        SELECT * FROM attendance 
+        WHERE employee_id = ? AND record_date >= ?
+        ORDER BY record_date DESC
+    """, (employee_id, thirty_days_ago))
+    attendance_records = cursor.fetchall()
+
+    # 3. 근태 통계 (이번 달)
+    current_month_str = datetime.now().strftime('%Y-%m')
+    cursor.execute("""
+        SELECT 
+            COUNT(CASE WHEN attendance_status='지각' THEN 1 END) as late,
+            COUNT(CASE WHEN attendance_status='결근' THEN 1 END) as absent,
+            COUNT(CASE WHEN attendance_status='조퇴' THEN 1 END) as early_leave
+        FROM attendance 
+        WHERE employee_id = ? AND strftime('%Y-%m', record_date) = ?
+    """, (employee_id, current_month_str))
+    stats = cursor.fetchone()
+    attendance_stats = {'late': stats['late'], 'absent': stats['absent'], 'early_leave': stats['early_leave']}
+    
+    # 4. 고정 수당/공제 (간략히)
+    cursor.execute("SELECT allowance_name, amount FROM fixed_allowances WHERE employee_id = ?", (employee_id,))
+    allowances = cursor.fetchall()
+    
+    conn.close()
+    
+    # ✅ 중요: base.html을 확장하지 않는 '조각 템플릿'을 렌더링합니다.
+    return render_template('modal_employee_detail.html', 
+                           employee=employee,
+                           attendance_records=attendance_records,
+                           attendance_stats=attendance_stats,
+                           allowances=allowances)
 
 if __name__ == '__main__':
     app.run(debug=True)

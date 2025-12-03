@@ -1,0 +1,128 @@
+<div style="display: flex; gap: 20px;">
+    <div style="flex: 0 0 120px; text-align: center;">
+        <img src="{{ url_for('static', filename='profile_photos/' + (employee['profile_image'] or 'default.jpg')) }}" 
+             alt="프로필 사진" 
+             style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #eee;">
+        <h3 style="margin: 10px 0 5px 0; color: #2c3e50;">{{ employee['name'] }}</h3>
+        <span style="color: #7f8c8d;">{{ employee['position'] }}</span>
+        <div style="margin-top: 10px;">
+            <span class="status-badge status-{{ '재직' if employee['status'] == '재직' else '퇴사' }}">
+                {{ employee['status'] }}
+            </span>
+        </div>
+    </div>
+
+    <div style="flex-grow: 1;">
+        
+        <div class="tab-header" style="margin-bottom: 15px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            
+            <div>
+                <button class="tab-btn active" onclick="openModalTab(event, 'modal-info')">기본 정보</button>
+                <button class="tab-btn" onclick="openModalTab(event, 'modal-attendance')">근태 기록</button>
+            </div>
+
+            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
+                
+                {% if employee['status'] == '재직' %}
+                <a href="{{ url_for('print_certificate', employee_id=employee['id']) }}" target="_blank" class="btn sub-action-btn" style="padding: 5px 12px; font-size: 0.9em; text-decoration: none; background-color: #8e44ad;">
+                    📜 증명서
+                </a>
+                {% endif %}
+
+                {% if g.user.role == 'admin' %}
+                    <a href="{{ url_for('edit_employee', employee_id=employee['id']) }}" class="btn sub-action-btn" style="padding: 5px 12px; font-size: 0.9em; text-decoration: none;">
+                        ✏️ 수정
+                    </a>
+
+                    {% if employee['status'] == '재직' %}
+                    <form action="{{ url_for('process_departure', employee_id=employee['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('🚨 경고: 정말로 [{{ employee.name }}] 님을 퇴사 처리하시겠습니까?\n\n- 상태가 [퇴사]로 변경됩니다.\n- 로그인 권한이 [user]로 강등됩니다.');">
+                        <button type="submit" class="btn danger-action-btn" style="padding: 5px 12px; font-size: 0.9em;">
+                            👋 퇴사
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    {% if employee['status'] == '퇴사' %}
+                    <form action="{{ url_for('process_rehire', employee_id=employee['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('정말로 [{{ employee.name }}] 님을 재입사(복직) 처리하시겠습니까?');">
+                        <button type="submit" class="btn main-action-btn" style="padding: 5px 12px; font-size: 0.9em;">
+                            ♻️ 재입사
+                        </button>
+                    </form>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="modal-info" class="tab-content-modal" style="display: block;">
+            <table class="employee-table" style="margin-top: 0;">
+                <tr><th>사번</th><td>{{ employee['id'] }}</td><th>부서</th><td>{{ employee['department'] }}</td></tr>
+                <tr><th>생년월일</th><td>{{ employee['birth_date'] }}</td><th>입사일</th><td>{{ employee['hire_date'] }}</td></tr>
+                <tr><th>연락처</th><td colspan="3">{{ employee['phone_number'] }}</td></tr>
+                <tr><th>이메일</th><td colspan="3">{{ employee['email'] }}</td></tr>
+                <tr><th>주소</th><td colspan="3">{{ employee['address'] }}</td></tr>
+            </table>
+            
+            <h5 style="margin: 15px 0 10px; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">급여 정보 요약</h5>
+             <table class="employee-table" style="margin-top: 0;">
+                <tr>
+                    <th>계약 연봉</th>
+                    <td>{{ employee['annual_salary']|comma if employee['annual_salary'] else '-' }} 원</td>
+                    <th>월 기본급</th>
+                    <td>{{ employee['base_salary']|comma if employee['base_salary'] else '-' }} 원</td>
+                </tr>
+                <tr>
+                    <th>고정 수당</th>
+                    <td colspan="3">
+                        {% if allowances %}
+                            {% for all in allowances %}{{ all['allowance_name'] }}({{ all['amount']|comma }}){% if not loop.last %}, {% endif %}{% endfor %}
+                        {% else %}없음{% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div id="modal-attendance" class="tab-content-modal" style="display: none;">
+            <div style="margin-bottom: 10px; font-size: 0.9em; color: #555;">
+                <span style="margin-right: 10px;">이번 달 지각: <strong>{{ attendance_stats['late'] }}회</strong></span>
+                <span>결근: <strong>{{ attendance_stats['absent'] }}회</strong></span>
+            </div>
+            
+            <div style="width: 100%;"> 
+                <table class="employee-table" style="margin-top: 0;">
+                    <thead>
+                        <tr><th>날짜</th><th>출근</th><th>퇴근</th><th>상태</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for record in attendance_records %}
+                        <tr>
+                            <td>{{ record['record_date'] }}</td>
+                            <td>{{ record['clock_in_time'].split(' ')[1][:5] if record['clock_in_time'] else '-' }}</td>
+                            <td>{{ record['clock_out_time'].split(' ')[1][:5] if record['clock_out_time'] else '-' }}</td>
+                            <td><span class="status-badge {{ 'status-정상' if record['attendance_status'] == '정상' else 'status-지각' }}">{{ record['attendance_status'] }}</span></td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" style="text-align: center; color: #999;">최근 근태 기록이 없습니다.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 모달 내부 탭 전환 스크립트
+    function openModalTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content-modal");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].style.display = "none";
+        }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].className = tablinks[i].className.replace(" active", "");
+        }
+        document.getElementById(tabName).style.display = "block";
+        evt.currentTarget.className += " active";
+    }
+</script>

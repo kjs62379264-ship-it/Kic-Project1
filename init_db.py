@@ -7,7 +7,7 @@ def init_database():
     cursor = conn.cursor()
 
     # ---------------------------------------------------------
-    # 1. 모든 테이블 삭제 (초기화) - 참조 관계 역순으로 삭제
+    # 1. 모든 테이블 삭제 (초기화)
     # ---------------------------------------------------------
     cursor.execute("DROP TABLE IF EXISTS payroll_rates") 
     cursor.execute("DROP TABLE IF EXISTS salary_payments")
@@ -23,7 +23,6 @@ def init_database():
     cursor.execute("DROP TABLE IF EXISTS positions")
     cursor.execute("DROP TABLE IF EXISTS departments")
     
-    # 혹시 모를 구버전 테이블 정리
     cursor.execute("DROP TABLE IF EXISTS salary")
     cursor.execute("DROP TABLE IF EXISTS allowances")
     cursor.execute("DROP TABLE IF EXISTS deductions")
@@ -44,7 +43,15 @@ def init_database():
         ('company.com',), ('gmail.com',), ('naver.com',), ('kakao.com',)
     ]
 
-    cursor.execute("CREATE TABLE departments (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, code TEXT UNIQUE NOT NULL);")
+    # departments 테이블 생성 (is_active 포함)
+    cursor.execute("""
+        CREATE TABLE departments (
+            id INTEGER PRIMARY KEY, 
+            name TEXT UNIQUE NOT NULL, 
+            code TEXT UNIQUE NOT NULL,
+            is_active BOOLEAN DEFAULT 1
+        );
+    """)
     cursor.executemany("INSERT INTO departments (name, code) VALUES (?, ?)", departments_list)
     
     cursor.execute("CREATE TABLE positions (id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL);")
@@ -54,12 +61,14 @@ def init_database():
     cursor.executemany("INSERT INTO email_domains (domain) VALUES (?)", email_domains_list)
 
     # ---------------------------------------------------------
-    # 3. 인사/근태 메인 테이블 생성
+    # 3. 인사/근태 메인 테이블 생성 (✅ birth_date 추가)
     # ---------------------------------------------------------
     cursor.execute("""
     CREATE TABLE employees (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, department TEXT NOT NULL, position TEXT NOT NULL,
-        hire_date DATE NOT NULL, phone_number TEXT, email TEXT, address TEXT, gender TEXT,
+        hire_date DATE NOT NULL, 
+        birth_date DATE,  -- ✅ 생년월일 추가
+        phone_number TEXT, email TEXT, address TEXT, gender TEXT,
         status TEXT DEFAULT '재직' NOT NULL, profile_image TEXT
     );""")
 
@@ -101,54 +110,50 @@ def init_database():
     # 4. 급여 관리 전용 테이블 생성
     # ---------------------------------------------------------
     
-    # (1) 연봉 계약 정보
     cursor.execute("""
     CREATE TABLE salary_contracts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id TEXT NOT NULL,
-        base_salary INTEGER NOT NULL,      -- 월 기본급
-        annual_salary INTEGER NOT NULL,    -- 연봉 총액
-        bank_name TEXT,                    -- 급여 계좌 은행명
-        account_number TEXT,               -- 급여 계좌 번호
+        base_salary INTEGER NOT NULL,      
+        annual_salary INTEGER NOT NULL,    
+        bank_name TEXT,                    
+        account_number TEXT,               
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (2) 고정 수당 항목
     cursor.execute("""
     CREATE TABLE fixed_allowances (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id TEXT NOT NULL,
-        allowance_name TEXT NOT NULL,      -- 수당명
-        amount INTEGER NOT NULL,           -- 금액
-        is_taxable BOOLEAN DEFAULT 1,      -- 과세 여부
+        allowance_name TEXT NOT NULL,      
+        amount INTEGER NOT NULL,           
+        is_taxable BOOLEAN DEFAULT 1,      
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (3) 고정 공제 항목
     cursor.execute("""
     CREATE TABLE fixed_deductions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id TEXT NOT NULL,
-        deduction_name TEXT NOT NULL,      -- 공제명
-        amount INTEGER NOT NULL,           -- 금액
+        deduction_name TEXT NOT NULL,      
+        amount INTEGER NOT NULL,           
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (4) 급여 지급 기록 테이블
     cursor.execute("""
     CREATE TABLE salary_payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         employee_id TEXT NOT NULL,
-        payment_year INTEGER NOT NULL,     -- 귀속 년도
-        payment_month INTEGER NOT NULL,    -- 귀속 월
-        payment_date DATE NOT NULL,        -- 지급일
+        payment_year INTEGER NOT NULL,     
+        payment_month INTEGER NOT NULL,    
+        payment_date DATE NOT NULL,        
         
-        total_base INTEGER NOT NULL,       -- 기본급
-        total_allowance INTEGER NOT NULL,  -- 수당 합계
-        overtime_pay INTEGER DEFAULT 0,    -- 야근 수당
-        total_deduction INTEGER NOT NULL,  -- 공제 합계
-        net_salary INTEGER NOT NULL,       -- 실 수령액
+        total_base INTEGER NOT NULL,       
+        total_allowance INTEGER NOT NULL,  
+        overtime_pay INTEGER DEFAULT 0,    
+        total_deduction INTEGER NOT NULL,  
+        net_salary INTEGER NOT NULL,       
         
         national_pension INTEGER DEFAULT 0, 
         health_insurance INTEGER DEFAULT 0, 
@@ -161,7 +166,6 @@ def init_database():
         FOREIGN KEY (employee_id) REFERENCES employees (id)
     );""")
 
-    # (5) 급여 요율 설정 테이블
     cursor.execute("""
     CREATE TABLE payroll_rates (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -171,7 +175,6 @@ def init_database():
         employment_insurance_rate REAL DEFAULT 0.9 
     );""")
     
-    # 기본 요율 데이터 삽입
     cursor.execute("""
         INSERT INTO payroll_rates (id, national_pension_rate, health_insurance_rate, care_insurance_rate, employment_insurance_rate)
         VALUES (1, 4.5, 3.545, 12.95, 0.9)
@@ -180,41 +183,21 @@ def init_database():
     print("모든 테이블 생성 완료.")
 
     # ---------------------------------------------------------
-    # 5. 초기 데이터 삽입
+    # 5. 초기 데이터 삽입 (✅ 생년월일 추가)
     # ---------------------------------------------------------
 
-    # (1) 직원 정보 (이미지는 기본 default.jpg로 통일하거나 있는 파일명 사용)
+    # (1) 직원 정보 (hire_date 뒤에 birth_date 추가)
+    # (이미지는 모두 default.jpg 또는 profile_1.jpg로 통일)
     employees_data = [
-        # ... 기존 데이터 뒤에 추가 ...
-        #('25HR0002', '박지성', '인사팀', '팀장', '2025-01-02', '010-1000-0001', 'park@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
-        #('25MK0002', '김연아', '마케팅팀', '팀장', '2025-01-05', '010-2000-0002', 'yuna@company.com', '경기도 군포시', '여성', '재직', 'default.jpg'),
-        #('25SL0001', '손흥민', '영업팀', '과장', '2025-02-01', '010-3000-0003', 'son@company.com', '강원도 춘천시', '남성', '재직', 'default.jpg'),
-        #('25HR0003', '김연경', '인사팀', '과장', '2025-02-10', '010-4000-0004', 'kimyk@company.com', '경기도 안산시', '여성', '재직', 'default.jpg'),
-        #('25FN0001', '박세리', '재무팀', '팀장', '2025-01-01', '010-5000-0005', 'seri@company.com', '대전광역시 유성구', '여성', '재직', 'default.jpg'),
-        #('25DV0002', '이상화', '개발팀', '과장', '2025-03-01', '010-6000-0006', 'lee@company.com', '서울시 동대문구', '여성', '재직', 'default.jpg'),
-        #('25SL0002', '이정후', '영업팀', '대리', '2025-03-05', '010-7000-0007', 'hoo@company.com', '광주광역시 서구', '남성', '재직', 'default.jpg'),
-        #('25HR0004', '장미란', '인사팀', '대리', '2025-02-15', '010-8000-0008', 'rose@company.com', '경기도 고양시', '여성', '재직', 'default.jpg'),
-        #('25DV0003', '윤성빈', '개발팀', '대리', '2025-04-01', '010-9000-0009', 'yun@company.com', '경상남도 남해군', '남성', '재직', 'default.jpg'),
-        #('25FN0002', '류현진', '재무팀', '과장', '2025-01-20', '010-1111-0010', 'ryu@company.com', '인천광역시 동구', '남성', '재직', 'default.jpg'),
-        #('25DS0002', '김제덕', '디자인팀', '사원', '2025-05-01', '010-2222-0011', 'duck@company.com', '경상북도 예천군', '남성', '재직', 'default.jpg'),
-        #('25DS0003', '안산', '디자인팀', '주임', '2025-04-15', '010-3333-0012', 'ansan@company.com', '광주광역시 북구', '여성', '재직', 'default.jpg'),
-        #('25MK0003', '신유빈', '마케팅팀', '사원', '2025-05-10', '010-4444-0013', 'shin@company.com', '경기도 수원시', '여성', '재직', 'default.jpg'),
-        #('25SL0003', '황선우', '영업팀', '사원', '2025-05-12', '010-5555-0014', 'hwang@company.com', '경기도 수원시', '남성', '재직', 'default.jpg'),
-        #('25MK0004', '우상혁', '마케팅팀', '대리', '2025-03-20', '010-6666-0015', 'woo@company.com', '대전광역시 대덕구', '남성', '재직', 'default.jpg'),
-        #('25DS0004', '여서정', '디자인팀', '주임', '2025-04-20', '010-7777-0016', 'yeo@company.com', '경기도 용인시', '여성', '재직', 'default.jpg'),
-        #('25HR0005', '차범근', '인사팀', '팀장', '2025-01-01', '010-8888-0017', 'cha@company.com', '경기도 화성시', '남성', '재직', 'default.jpg'),
-        #('25SL0004', '김하성', '영업팀', '대리', '2025-03-10', '010-9999-0018', 'ha@company.com', '경기도 부천시', '남성', '재직', 'default.jpg'),
-        #('25MK0005', '허웅', '마케팅팀', '주임', '2025-04-05', '010-1212-0019', 'heo@company.com', '서울시 용산구', '남성', '재직', 'default.jpg'),
-        #('25DV0004', '조구함', '개발팀', '주임', '2025-04-01', '010-3434-0020', 'cho@company.com', '강원도 춘천시', '남성', '재직', 'default.jpg'),
-        ('25HR0001', '임꺽정', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
-        ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'default.jpg'),
-        ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'default.jpg'),
-        ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'default.jpg'),
-        ('admin', '홍길동', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
+        ('25HR0001', '임꺽정', '인사팀', '과장', '2025-01-10', '1990-05-15', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
+        ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '1993-08-22', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'default.jpg'),
+        ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '1996-12-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'default.jpg'),
+        ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '1998-03-10', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'default.jpg'),
+        ('admin', '홍길동', '-', '관리자', '2025-01-01', '1985-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
     ]
     cursor.executemany("""
-        INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO employees (id, name, department, position, hire_date, birth_date, phone_number, email, address, gender, status, profile_image)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, employees_data)
 
     # (2) 로그인 정보
@@ -233,7 +216,7 @@ def init_database():
     # (3) 공지사항
     cursor.execute("INSERT INTO notices (title, content) VALUES (?, ?)", ('환영합니다!', '인사관리 시스템이 오픈되었습니다.'))
 
-    # (4) 급여 계약 정보 샘플
+    # (4) 급여 계약 정보
     salary_contracts_data = [
         ('25HR0001', 4166660, 50000000, '국민은행', '123-456-7890'),
         ('25DV0001', 3333330, 40000000, '신한은행', '110-222-333333'),
@@ -245,7 +228,7 @@ def init_database():
         VALUES (?, ?, ?, ?, ?)
     """, salary_contracts_data)
 
-    # (5) 고정 수당 정보 샘플
+    # (5) 고정 수당
     allowance_data = [
         ('25HR0001', '식대', 200000, 0), 
         ('25HR0001', '직책수당', 300000, 1),
@@ -257,10 +240,10 @@ def init_database():
         VALUES (?, ?, ?, ?)
     """, allowance_data)
 
-    # (6) 휴가 요청 샘플 데이터
+    # (6) 휴가 요청 샘플
     vacation_data = [
         ('25DV0001', '김개발', '개발팀', '연차', '2025-11-20', '2025-11-20', '가족 행사 참석', '대기'),
-        ('25HR0001', '홍길동', '인사팀', '병가', '2025-12-05', '2025-12-06', '수술 후 회복', '승인'),
+        ('25HR0001', '임꺽정', '인사팀', '병가', '2025-12-05', '2025-12-06', '수술 후 회복', '승인'),
         ('25DS0001', '이디자인', '디자인팀', '오후 반차', '2025-11-15', '2025-11-15', '병원 검진', '반려'),
     ]
     for uid, uname, udept, rtype, start, end, reason, status in vacation_data:
