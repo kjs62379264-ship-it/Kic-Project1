@@ -206,11 +206,11 @@ def init_database():
         #('25SL0004', '김하성', '영업팀', '대리', '2025-03-10', '010-9999-0018', 'ha@company.com', '경기도 부천시', '남성', '재직', 'default.jpg'),
         #('25MK0005', '허웅', '마케팅팀', '주임', '2025-04-05', '010-1212-0019', 'heo@company.com', '서울시 용산구', '남성', '재직', 'default.jpg'),
         #('25DV0004', '조구함', '개발팀', '주임', '2025-04-01', '010-3434-0020', 'cho@company.com', '강원도 춘천시', '남성', '재직', 'default.jpg'),
-        ('25HR0001', '홍길동', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
+        ('25HR0001', '임꺽정', '인사팀', '과장', '2025-01-10', '010-1234-5678', 'hong@company.com', '서울시 강남구', '남성', '재직', 'default.jpg'),
         ('25DV0001', '김개발', '개발팀', '대리', '2025-03-15', '010-2222-3333', 'kim@company.com', '경기도 성남시', '여성', '재직', 'default.jpg'),
         ('25DS0001', '이디자인', '디자인팀', '주임', '2025-02-01', '010-4444-5555', 'lee@company.com', '서울시 마포구', '여성', '재직', 'default.jpg'),
         ('25MK0001', '박마케', '마케팅팀', '사원', '2025-04-20', '010-7777-8888', 'park@company.com', '인천시 연수구', '남성', '재직', 'default.jpg'),
-        ('admin', '관리자', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
+        ('admin', '홍길동', '-', '관리자', '2025-01-01', '010-0000-0000', 'sys@company.com', '본사', '남성', '재직', 'profile_1.jpg'),
     ]
     cursor.executemany("""
         INSERT INTO employees (id, name, department, position, hire_date, phone_number, email, address, gender, status, profile_image)
