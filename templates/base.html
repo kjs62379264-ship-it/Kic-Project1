@@ -90,7 +90,6 @@
                             {% if g.user.role == 'admin' %}
                             <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
                             <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
-                            <li><a href="{{ url_for('add_notice_page') }}">- 공지사항 작성</a></li>
                             <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
                             {% endif %}
                         </ul>

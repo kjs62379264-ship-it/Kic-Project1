@@ -3,39 +3,79 @@
 {% block title %}마이 페이지{% endblock %}
 {% block page_body_class %}my-page{% endblock %}
 
+{% block custom_styles %}
+<style>
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        
+        /* ✅ [핵심 수정] 상단(헤더): 자동 / 중단(정보): 자동(내용만큼) / 하단(요약): 남은공간 전부 */
+        grid-template-rows: auto auto 1fr; 
+        gap: 15px;
+    }
+
+    /* 기본 카드 설정 */
+    .card {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+        /* height: 100% 제거 (개별 설정으로 변경) */
+    }
+
+    /* ✅ [신규] 중간 카드들 (기본 정보, 급여 정보) */
+    /* 높이를 강제하지 않고 내용물 크기에 맞춤 */
+    .card-middle {
+        height: auto !important; 
+    }
+
+    /* ✅ [신규] 하단 카드 (근태 요약) */
+    /* 남은 공간을 모두 채워서 사이드바 길이를 맞춤 */
+    .card-bottom {
+        height: 100% !important;
+    }
+
+    .card-body {
+        flex-grow: 1;
+        padding: 15px 20px;
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
 
-<div class="card" style="grid-column: 1 / 3; background-color: #fff; min-height: auto;">
-    <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 20px 20px;">
+<div class="card" style="grid-column: 1 / 3; grid-row: 1 / 2; min-height: auto;">
+    <div class="card-body" style="display: flex; align-items: center; justify-content: space-between; padding: 15px 20px;">
         
-        <div style="display: flex; align-items: baseline; gap: 15px;">
-            <h1 style="margin: 0; font-size: 1.3em; color: #2c3e50; line-height: 1;">
+        <div style="display: flex; align-items: baseline; gap: 10px;">
+            <h1 style="margin: 0; font-size: 1.2em; color: #2c3e50; line-height: 1;">
                 {{ g.user['name'] }} {{ g.user['position'] }}
             </h1>
-            <span style="color: #7f8c8d; font-size: 0.9em;">
+            <span style="color: #7f8c8d; font-size: 0.85em;">
                 | &nbsp; {{ g.user['department'] }} &nbsp; (사번: {{ g.user['id'] }})
             </span>
         </div>
 
         <div>
-            <a href="{{ url_for('edit_employee', employee_id=g.user['id']) }}" class="btn sub-action-btn" style="padding: 4px 10px; font-size: 0.8em;">
+            <a href="{{ url_for('edit_employee', employee_id=g.user['id']) }}" class="btn sub-action-btn" style="padding: 3px 8px; font-size: 0.8em;">
                 ✏️ 정보 수정
             </a>
         </div>
     </div>
 </div>
 
-<div class="card" style="grid-column: 1 / 2;">
+<div class="card card-middle" style="grid-column: 1 / 2; grid-row: 2 / 3;">
     <div class="card-header">👤 기본 정보</div>
-    <div class="card-body" style="padding: 10px 20px 20px 20px;">
+    <div class="card-body" style="padding: 10px 20px 5px 20px;">
         <table class="employee-table" style="border: none; margin-top: 0;">
             <tr>
                 <th style="width: 30%; background: none; border: none; border-bottom: 1px solid #eee;">입사일</th>
                 <td style="border: none; border-bottom: 1px solid #eee;">
                     {{ g.user['hire_date'] }} 
-                    <span style="color: #2980b9; font-weight: bold; margin-left: 5px;">
-                        {{ tenure_text }}
-                    </span>
+                    <span style="color: #2980b9; font-weight: bold; margin-left: 5px;">{{ tenure_text }}</span>
                 </td>
             </tr>
             <tr>
@@ -64,27 +104,21 @@
     </div>
 </div>
 
-<div class="card" style="grid-column: 2 / 3;">
+<div class="card card-middle" style="grid-column: 2 / 3; grid-row: 2 / 3;">
     <div class="card-header">💰 급여 및 계좌 정보</div>
-    <div class="card-body" style="padding: 10px 20px 20px 20px;">
+    <div class="card-body" style="padding: 10px 20px 5px 20px;">
         <table class="employee-table" style="border: none; margin-top: 0;">
             <tr>
                 <th style="width: 30%; background: none; border: none; border-bottom: 1px solid #eee;">급여 지급일</th>
-                <td style="border: none; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">
-                    매월 25일
-                </td>
+                <td style="border: none; border-bottom: 1px solid #eee; font-weight: bold; color: #2c3e50;">매월 25일</td>
             </tr>
             <tr>
                 <th style="background: none; border: none; border-bottom: 1px solid #eee;">지급 은행</th>
-                <td style="border: none; border-bottom: 1px solid #eee;">
-                    {{ contract['bank_name'] if contract else '-' }}
-                </td>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ contract['bank_name'] if contract else '-' }}</td>
             </tr>
             <tr>
                 <th style="background: none; border: none; border-bottom: 1px solid #eee;">계좌 번호</th>
-                <td style="border: none; border-bottom: 1px solid #eee;">
-                    {{ contract['account_number'] if contract else '-' }}
-                </td>
+                <td style="border: none; border-bottom: 1px solid #eee;">{{ contract['account_number'] if contract else '-' }}</td>
             </tr>
             <tr>
                 <th style="background: none; border: none; border-bottom: 1px solid #eee;">계약 연봉</th>
@@ -92,14 +126,10 @@
                     {% if contract %}
                         <span class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer;">
                             <span class="hidden-text">****** 원</span>
-                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">
-                                {{ contract['annual_salary']|comma }} 원
-                            </span>
+                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">{{ contract['annual_salary']|comma }} 원</span>
                         </span>
                         <span style="font-size: 0.8em; color: #999;">(클릭)</span>
-                    {% else %}
-                        -
-                    {% endif %}
+                    {% else %} - {% endif %}
                 </td>
             </tr>
             <tr>
@@ -108,19 +138,15 @@
                     {% if contract %}
                         <span class="security-blur" onclick="this.classList.toggle('revealed')" style="cursor: pointer;">
                             <span class="hidden-text">****** 원</span>
-                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">
-                                {{ contract['base_salary']|comma }} 원
-                            </span>
+                            <span class="real-text" style="display: none; color: #2980b9; font-weight: bold;">{{ contract['base_salary']|comma }} 원</span>
                         </span>
-                    {% else %}
-                        -
-                    {% endif %}
+                    {% else %} - {% endif %}
                 </td>
             </tr>
         </table>
-        <div style="margin-top: 20px; text-align: right;">
-            <a href="{{ url_for('my_salary') }}" class="sub-action-btn" style="font-size: 0.9em;">
-                급여 명세서 전체 보기 >
+        <div style="margin-top: 15px; text-align: right;">
+            <a href="{{ url_for('my_salary') }}" class="sub-action-btn" style="font-size: 0.85em; padding: 5px 10px;">
+                급여 명세서 전체 보기
             </a>
         </div>
     </div>
@@ -133,86 +159,76 @@
         
         <div style="display: flex; flex: 1; border-bottom: 1px solid #eee;">
             
-            <div style="flex: 1; padding: 25px; border-right: 1px solid #eee;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; color: #333; text-align: center; font-size: 1.1em;">📅 이번 달</h4>
+            <div style="flex: 1; padding: 20px; border-right: 1px solid #eee;">
+                <h4 style="margin: 0 0 15px 0; color: #333; text-align: center; font-size: 1.2em;">📅 이번 달</h4>
                 
-                <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.95em; color: #555;">
-                    
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 1.05em; color: #555;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span>지각 / 결근</span> 
-                        <span style="font-size: 1.1em;">
-                            <strong style="color: #333;">{{ monthly_stats.late_count }}회</strong>
-                            <span style="color: #ccc; margin: 0 5px;">|</span>
-                            <strong style="color: #333;">{{ monthly_stats.absent_count }}회</strong>
+                        <span>
+                            <strong style="color: #333; font-size: 1.1em;">{{ monthly_stats.late_count }}회</strong>
+                            <span style="color: #ccc; margin: 0 8px;">|</span>
+                            <strong style="color: #333; font-size: 1.1em;">{{ monthly_stats.absent_count }}회</strong>
                         </span>
                     </div>
-
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span>초과근무 (시간 / 일수)</span> 
-                        <span style="font-size: 1.1em;">
-                            <strong style="color: #333;">{{ monthly_stats.overtime_hours }}</strong>
-                            <span style="color: #ccc; margin: 0 5px;">|</span>
-                            <strong style="color: #333;">{{ monthly_stats.overtime_days }}일</strong>
+                        <span>
+                            <strong style="color: #333; font-size: 1.1em;">{{ monthly_stats.overtime_hours }}</strong>
+                            <span style="color: #ccc; margin: 0 8px;">|</span>
+                            <strong style="color: #333; font-size: 1.1em;">{{ monthly_stats.overtime_days }}일</strong>
                         </span>
                     </div>
-
                 </div>
             </div>
 
-            <div style="flex: 1; padding: 25px;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; color: #7f8c8d; text-align: center; font-size: 1.1em;">📆 올해 누적</h4>
+            <div style="flex: 1; padding: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #7f8c8d; text-align: center; font-size: 1.2em;">📆 올해 누적</h4>
                 
-                <div style="display: flex; flex-direction: column; gap: 15px; font-size: 0.95em; color: #7f8c8d;">
-                    
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 1.05em; color: #7f8c8d;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span>지각 / 결근</span> 
-                        <span style="font-size: 1.1em;">
-                            <strong>{{ yearly_stats.late_count }}회</strong>
-                            <span style="color: #eee; margin: 0 5px;">|</span>
-                            <strong>{{ yearly_stats.absent_count }}회</strong>
+                        <span>
+                            <strong style="font-size: 1.1em;">{{ yearly_stats.late_count }}회</strong>
+                            <span style="color: #eee; margin: 0 8px;">|</span>
+                            <strong style="font-size: 1.1em;">{{ yearly_stats.absent_count }}회</strong>
                         </span>
                     </div>
-
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span>초과근무 (시간 / 일수)</span> 
-                        <span style="font-size: 1.1em;">
-                            <strong>{{ yearly_stats.overtime_hours }}</strong>
-                            <span style="color: #eee; margin: 0 5px;">|</span>
-                            <strong>{{ yearly_stats.overtime_days }}일</strong>
+                        <span>
+                            <strong style="font-size: 1.1em;">{{ yearly_stats.overtime_hours }}</strong>
+                            <span style="color: #eee; margin: 0 8px;">|</span>
+                            <strong style="font-size: 1.1em;">{{ yearly_stats.overtime_days }}일</strong>
                         </span>
                     </div>
-
                 </div>
             </div>
         </div>
 
-        <div style="padding: 15px 20px; text-align: center; background-color: #fafafa;"> 
-            <div style="font-size: 1em; color: #555; margin-bottom: 10px;">잔여 연차</div> 
-            <div style="font-size: 2.5em; font-weight: bold; color: #2c3e50; line-height: 1;">
+        <div style="padding: 20px; text-align: center; background-color: #fafafa;">
+            <div style="font-size: 1.1em; color: #555; margin-bottom: 5px;">잔여 연차</div>
+            <div style="font-size: 2.8em; font-weight: bold; color: #2c3e50; line-height: 1;">
                 {{ remaining_leave }} <span style="font-size: 0.5em; color: #999; font-weight: normal;">일</span>
             </div>
-            
-            <a href="{{ url_for('vacation_request') }}" style="display: inline-block; margin-top: 10px; font-size: 0.9em; color: #999; text-decoration: none; border: 1px solid #ddd; padding: 5px 15px; border-radius: 20px; background-color: white; transition: background-color 0.2s;">
-                휴가 신청하기 &gt;
+            <a href="{{ url_for('vacation_request') }}" style="display: inline-block; margin-top: 10px; font-size: 0.95em; color: #999; text-decoration: none; border: 1px solid #ddd; padding: 4px 18px; border-radius: 20px; background-color: white; transition: background-color 0.2s;">
+                휴가 신청하기
             </a>
         </div>
 
     </div>
 </div>
 
+
 <script>
-    // 연봉 정보 클릭 시 토글 기능
     document.querySelectorAll('.security-blur').forEach(item => {
         item.addEventListener('click', function() {
             const hidden = this.querySelector('.hidden-text');
             const real = this.querySelector('.real-text');
-            
             if (real.style.display === 'none') {
-                real.style.display = 'inline';
-                hidden.style.display = 'none';
+                real.style.display = 'inline'; hidden.style.display = 'none';
             } else {
-                real.style.display = 'none';
-                hidden.style.display = 'inline';
+                real.style.display = 'none'; hidden.style.display = 'inline';
             }
         });
     });
