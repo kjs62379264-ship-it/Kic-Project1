@@ -1815,7 +1815,7 @@ def calculate_all_salary():
     
     year = datetime.now().year
     month = datetime.now().month
-    payment_date = f"{year}-{month:02d}-25"
+    payment_date = f"{year}-{month:02d}-10"  # 매월 10일 지급 가정
 
     try:
         cur.execute("SELECT * FROM payroll_rates WHERE id = 1")
@@ -2066,30 +2066,40 @@ def delete_notice(notice_id):
 @app.route('/hr/settings')
 @admin_required
 def settings_management():
-    conn = sqlite3.connect('employees.db')
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+    conn = sqlite3.connect('employees.db'); conn.row_factory = sqlite3.Row; cur = conn.cursor()
     
-    # 1. 활성 부서 조회
-    cur.execute("SELECT * FROM departments WHERE is_active = 1")
-    active_depts = cur.fetchall()
+    # 부서 조회 (기존)
+    active_depts = cur.execute("SELECT * FROM departments WHERE is_active = 1").fetchall()
+    inactive_depts = cur.execute("SELECT * FROM departments WHERE is_active = 0").fetchall()
     
-    # 2. 비활성 부서 조회
-    cur.execute("SELECT * FROM departments WHERE is_active = 0")
-    inactive_depts = cur.fetchall()
-    
-    # 3. 직급 목록 (기존 유지)
-    cur.execute("SELECT * FROM positions")
-    p = cur.fetchall()
+    # ✅ [수정] 직급 조회 (활성/비활성 분리)
+    active_positions = cur.execute("SELECT * FROM positions WHERE is_active = 1").fetchall()
+    inactive_positions = cur.execute("SELECT * FROM positions WHERE is_active = 0").fetchall()
     
     conn.close()
     
-    # active_depts, inactive_depts를 각각 전달
     return render_template('settings_management.html', 
-                           active_departments=active_depts, 
-                           inactive_departments=inactive_depts, 
-                           positions=p)
-
+                           active_departments=active_depts, inactive_departments=inactive_depts,
+                           active_positions=active_positions, inactive_positions=inactive_positions) # ✅ 전달 변수 변경
+@app.route('/hr/settings/toggle_position/<int:pos_id>/<int:status>', methods=['POST'])
+@admin_required
+def toggle_position_status(pos_id, status):
+    conn = sqlite3.connect('employees.db'); cursor = conn.cursor()
+    try:
+        if status == 0: # 비활성 시도 시 체크
+            pos_name = cursor.execute("SELECT name FROM positions WHERE id=?", (pos_id,)).fetchone()[0]
+            count = cursor.execute("SELECT COUNT(*) FROM employees WHERE position=? AND status='재직'", (pos_name,)).fetchone()[0]
+            if count > 0:
+                flash(f"⛔ '{pos_name}' 직급인 직원이 {count}명 있어 비활성할 수 없습니다.", "error")
+                return redirect(url_for('settings_management'))
+                
+        cursor.execute("UPDATE positions SET is_active=? WHERE id=?", (status, pos_id))
+        conn.commit()
+        flash("직급 상태가 변경되었습니다.", "success")
+    except Exception as e:
+        conn.rollback(); flash(f"오류: {e}", "error")
+    finally: conn.close()
+    return redirect(url_for('settings_management'))
 @app.route('/hr/settings/toggle_department/<int:dept_id>/<int:status>', methods=['POST'])
 @admin_required
 def toggle_department_status(dept_id, status):
@@ -2169,7 +2179,29 @@ def add_position():
         finally:
             conn.close()
     return redirect(url_for('settings_management'))
-
+@app.route('/hr/settings/edit_position', methods=['POST'])
+@admin_required
+def edit_position():
+    position_id = request.form['position_id']
+    new_name = request.form['new_position_name'].strip()
+    
+    if new_name:
+        conn = sqlite3.connect('employees.db')
+        cursor = conn.cursor()
+        try:
+            cursor.execute("UPDATE positions SET name = ? WHERE id = ?", (new_name, position_id))
+            # (선택 사항) employees 테이블의 직급명도 같이 바꿔주려면 아래 쿼리 추가
+            # cursor.execute("UPDATE employees SET position = ? WHERE position = (SELECT name FROM positions WHERE id = ?)", (new_name, position_id))
+            
+            conn.commit()
+            flash("직급 정보가 수정되었습니다.", "success")
+        except Exception as e:
+            conn.rollback()
+            flash(f"오류 발생: {e}", "error")
+        finally:
+            conn.close()
+            
+    return redirect(url_for('settings_management'))
 @app.route('/hr/settings/delete_department/<dept_name>', methods=['POST'])
 @admin_required
 def delete_department(dept_name):

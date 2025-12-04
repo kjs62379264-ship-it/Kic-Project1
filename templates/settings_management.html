@@ -15,19 +15,23 @@
         gap: 20px;
     }
 
+    /* ✅ [수정] 입력창 크기/폰트 축소 */
     .settings-input {
-        padding: 10px;
-        font-size: 0.95em;
+        padding: 0 10px;
+        font-size: 0.9em; /* 0.95em -> 0.9em */
         border: 1px solid #ccc;
         border-radius: 4px;
-        height: 40px;
+        height: 36px; /* 40px -> 36px */
         box-sizing: border-box;
+        outline: none;
     }
+    .settings-input:focus { border-color: #3498db; }
 
+    /* ✅ [수정] 버튼 크기/폰트 축소 */
     .settings-btn {
+        height: 36px; /* 40px -> 36px */
+        line-height: 34px; /* border 포함 높이 보정 */
         padding: 0 15px;
-        height: 40px;
-        line-height: 40px;
         font-size: 0.9em;
         border-radius: 4px;
         border: none;
@@ -36,71 +40,65 @@
         white-space: nowrap;
         display: inline-block;
         box-sizing: border-box;
+        margin: 0;
+    }
+    
+    /* 작은 버튼 (리스트 내부용) */
+    .settings-btn.small {
+        height: 30px; /* 34px -> 30px */
+        line-height: 30px;
+        padding: 0 10px;
+        font-size: 0.8em; /* 폰트 더 작게 */
     }
 
-    .btn-add { background-color: #3498db; color: white; }
-    .btn-edit { background-color: #3498db; color: white; margin-right: 5px; }
-    
-    .btn-deactivate { background-color: #e67e22; color: white; }
-    .btn-activate { background-color: #2ecc71; color: white; }
-    .btn-delete { background-color: #e74c3c; color: white; }
-    
+    .btn-blue { background-color: #3498db; color: white; }
+    .btn-orange { background-color: #e67e22; color: white; }
+    .btn-green { background-color: #2ecc71; color: white; }
+    .btn-red { background-color: #e74c3c; color: white; }
+
+    /* ✅ [수정] 목록 폰트/패딩 축소 */
     .settings-list li {
-        font-size: 1.05em; 
-        padding: 10px 0; 
+        font-size: 0.95em; /* 1.1em -> 0.95em */
+        padding: 8px 5px; /* 12px -> 8px */
         display: flex; 
         justify-content: space-between; 
         align-items: center; 
         border-bottom: 1px solid #eee;
     }
+    .settings-list li:last-child { border-bottom: none; }
     
-    h4 { font-size: 1.1em; margin-bottom: 15px; color: #2c3e50; }
+    /* ✅ [수정] 제목 폰트/마진 축소 */
+    h4 { font-size: 1.05em; margin-bottom: 10px; color: #2c3e50; }
     
-    .inactive-section {
-        margin-top: 30px;
-        padding-top: 20px;
-        border-top: 2px dashed #eee;
-    }
-    .inactive-item span {
-        color: #aaa; 
-    }
-    /* ✅ [신규 추가] 마지막 행은 구분선 제거 */
-    .settings-list li:last-child {
-        border-bottom: none;
-    }
+    .inactive-section { margin-top: 20px; padding-top: 15px; border-top: 2px dashed #ddd; }
+    .inactive-item span { color: #999; }
 </style>
 {% endblock %}
 
 {% block page_content %}
 
 <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2; height: 100% !important; display: flex; flex-direction: column;">
-    <div class="card-header">
-        <span>부서 관리</span>
-    </div>
+    <div class="card-header"><span>부서 관리</span></div>
     
-    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 25px;">
-        
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding-top: 5px;">
         <h4>새 부서 추가</h4>
         <form method="POST" action="{{ url_for('add_department') }}" style="display: flex; gap: 10px; align-items: center;">
             <input type="text" name="new_department_name" placeholder="새 부서명" required class="settings-input" style="flex-grow: 2;">
-            <input type="text" name="new_department_code" placeholder="코드(2자리)" required maxlength="2" class="settings-input" style="width: 100px; text-align: center;">
-            <button type="submit" class="settings-btn btn-add" style="min-width: 70px;">추가</button>
+            <input type="text" name="new_department_code" placeholder="코드(2자리)" required maxlength="2" class="settings-input" style="width: 110px; text-align: center;">
+            <button type="submit" class="settings-btn btn-blue" style="min-width: 80px;">추가</button>
         </form>
-        
-        <hr style="margin: 25px 0;">
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
         
         <h4>🟢 현재 사용 중인 부서</h4>
         <ul class="settings-list">
             {% for dept in active_departments %}
             <li>
                 <span>{{ dept['name'] }} ({{ dept['code'] }})</span>
-                
                 {% if g.user.role == 'admin' %}
-                <div class="button-group" style="display: flex; align-items: center;">
-                    <button class="settings-btn btn-edit" style="height: 32px; line-height: 32px; padding: 0 10px; font-size: 0.85em;" onclick="openEditModal('{{ dept['name'] }}', '{{ dept['code'] }}')">수정</button>
-                    
+                <div class="button-group" style="display: flex; gap: 5px;">
+                    <button class="settings-btn small btn-blue" onclick="openEditModal('{{ dept['name'] }}', '{{ dept['code'] }}')">수정</button>
                     <form method="POST" action="{{ url_for('toggle_department_status', dept_id=dept['id'], status=0) }}" onsubmit="return confirm('\'{{ dept['name'] }}\' 부서를 비활성화 하시겠습니까?\n(활성 목록에서 제외됩니다)');" style="margin: 0;">
-                        <button type="submit" class="settings-btn btn-deactivate" style="height: 32px; line-height: 32px; padding: 0 10px; font-size: 0.85em;">비활성</button>
+                        <button type="submit" class="settings-btn small btn-orange">비활성</button>
                     </form>
                 </div>
                 {% endif %}
@@ -117,11 +115,10 @@
                 {% for dept in inactive_departments %}
                 <li class="inactive-item">
                     <span>{{ dept['name'] }} ({{ dept['code'] }})</span>
-                    
                     {% if g.user.role == 'admin' %}
-                    <div class="button-group" style="display: flex; align-items: center;">
+                    <div class="button-group">
                         <form method="POST" action="{{ url_for('toggle_department_status', dept_id=dept['id'], status=1) }}" onsubmit="return confirm('\'{{ dept['name'] }}\' 부서를 다시 사용하시겠습니까?');" style="margin: 0;">
-                            <button type="submit" class="settings-btn btn-activate" style="height: 32px; line-height: 32px; padding: 0 10px; font-size: 0.85em;">활성</button>
+                            <button type="submit" class="settings-btn small btn-green">활성</button>
                         </form>
                     </div>
                     {% endif %}
@@ -130,81 +127,128 @@
             </ul>
         </div>
         {% endif %}
-
     </div>
 </div>
 
 <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2; height: 100% !important; display: flex; flex-direction: column;">
-    <div class="card-header">
-        <span>직급 관리</span>
-    </div>
+    <div class="card-header"><span>직급/직책 관리</span></div>
     
-    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding: 25px;">
-        
+    <div class="card-body" style="flex-grow: 1; overflow-y: auto; padding-top: 5px;">
         <h4>새 직급 추가</h4>
         <form method="POST" action="{{ url_for('add_position') }}" style="display: flex; gap: 10px; align-items: center;">
             <input type="text" name="new_position" placeholder="새 직급명을 입력하세요" required class="settings-input" style="flex-grow: 1;">
-            <button type="submit" class="settings-btn btn-add" style="min-width: 70px;">추가</button>
+            <button type="submit" class="settings-btn btn-blue" style="min-width: 80px;">추가</button>
         </form>
+        <hr style="margin: 30px 0; border: 0; border-top: 1px solid #eee;">
         
-        <hr style="margin: 25px 0;">
-        
-        <h4>현재 직급 목록</h4>
+        <h4>🟢 현재 사용 중인 직급</h4>
         <ul class="settings-list">
-            {% for pos in positions %}
+            {% for pos in active_positions %}
             <li>
                 <span>{{ pos['name'] }}</span>
-                
                 {% if g.user.role == 'admin' %}
-                <div class="button-group">
-                    <form method="POST" action="{{ url_for('delete_position', pos_name=pos['name']) }}" onsubmit="return confirm('정말로 \'{{ pos['name'] }}\' 직급을 삭제하시겠습니까?');" style="margin: 0;">
-                        <button type="submit" class="settings-btn btn-delete" style="height: 32px; line-height: 32px; padding: 0 10px; font-size: 0.85em;">삭제</button>
+                <div class="button-group" style="display: flex; gap: 5px;">
+                    <button class="settings-btn small btn-blue" onclick="openEditPositionModal('{{ pos['id'] }}', '{{ pos['name'] }}')">수정</button>
+                    
+                    <form method="POST" action="{{ url_for('toggle_position_status', pos_id=pos['id'], status=0) }}" onsubmit="return confirm('\'{{ pos['name'] }}\' 직급을 비활성화 하시겠습니까?');" style="margin: 0;">
+                        <button type="submit" class="settings-btn small btn-orange">비활성</button>
                     </form>
                 </div>
                 {% endif %}
             </li>
+            {% else %}
+            <li style="color: #999;">등록된 직급이 없습니다.</li>
             {% endfor %}
         </ul>
+
+        {% if inactive_positions %}
+        <div class="inactive-section">
+            <h4 style="color: #95a5a6;">🔴 비활성 직급</h4>
+            <ul class="settings-list">
+                {% for pos in inactive_positions %}
+                <li class="inactive-item">
+                    <span>{{ pos['name'] }}</span>
+                    {% if g.user.role == 'admin' %}
+                    <div class="button-group">
+                        <form method="POST" action="{{ url_for('toggle_position_status', pos_id=pos['id'], status=1) }}" onsubmit="return confirm('\'{{ pos['name'] }}\' 직급을 다시 사용하시겠습니까?');" style="margin: 0;">
+                            <button type="submit" class="settings-btn small btn-green">활성</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
     </div>
 </div>
 
 <div id="editModal" class="modal">
-    <div class="modal-content">
-        <span class="close" onclick="closeEditModal()">&times;</span>
-        <h3>부서 정보 수정</h3>
-        <form method="POST" action="{{ url_for('edit_department') }}">
-            <input type="hidden" id="original_dept_name" name="original_dept_name">
-            <div class="form-group">
-                <label for="new_dept_name_modal">새 부서명</label>
-                <input type="text" id="new_dept_name_modal" name="new_dept_name" required class="settings-input" style="width: 100%;">
-            </div>
-            <div class="form-group">
-                <label for="new_dept_code_modal">새 부서 코드 (2자리)</label>
-                <input type="text" id="new_dept_code_modal" name="new_dept_code" required maxlength="2" class="settings-input" style="width: 100%;">
-            </div>
-            <button type="submit" class="btn main-action-btn" style="width: 100%; padding: 12px;">수정 완료</button>
-        </form>
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3>부서 정보 수정</h3>
+            <span class="close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('edit_department') }}">
+                <input type="hidden" id="original_dept_name" name="original_dept_name">
+                <div class="form-group">
+                    <label>새 부서명</label>
+                    <input type="text" id="new_dept_name_modal" name="new_dept_name" required class="settings-input" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label>새 부서 코드 (2자리)</label>
+                    <input type="text" id="new_dept_code_modal" name="new_dept_code" required maxlength="2" class="settings-input" style="width: 100%;">
+                </div>
+                <button type="submit" class="settings-btn btn-blue" style="width: 100%;">수정 완료</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="editPositionModal" class="modal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3>직급 정보 수정</h3>
+            <span class="close" onclick="closeEditPositionModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form method="POST" action="{{ url_for('edit_position') }}">
+                <input type="hidden" id="position_id_modal" name="position_id">
+                <div class="form-group">
+                    <label>새 직급명</label>
+                    <input type="text" id="new_position_name_modal" name="new_position_name" required class="settings-input" style="width: 100%;">
+                </div>
+                <button type="submit" class="settings-btn btn-blue" style="width: 100%;">수정 완료</button>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
+    // 부서 모달
     const modal = document.getElementById('editModal');
-    
     function openEditModal(name, code) {
         document.getElementById('original_dept_name').value = name;
         document.getElementById('new_dept_name_modal').value = name;
         document.getElementById('new_dept_code_modal').value = code;
-        modal.style.display = "block";
+        modal.style.display = "flex";
     }
+    function closeEditModal() { modal.style.display = "none"; }
 
-    function closeEditModal() {
-        modal.style.display = "none";
+    // ✅ [신규] 직급 모달
+    const posModal = document.getElementById('editPositionModal');
+    function openEditPositionModal(id, name) {
+        document.getElementById('position_id_modal').value = id;
+        document.getElementById('new_position_name_modal').value = name;
+        posModal.style.display = "flex";
     }
+    function closeEditPositionModal() { posModal.style.display = "none"; }
 
+    // 배경 클릭 닫기
     window.onclick = function(event) {
-        if (event.target == modal) {
-            closeEditModal();
-        }
+        if (event.target == modal) closeEditModal();
+        if (event.target == posModal) closeEditPositionModal();
     }
 </script>
 

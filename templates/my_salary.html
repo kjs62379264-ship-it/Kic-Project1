@@ -64,7 +64,7 @@
     
     <div class="card-body" style="display: flex; flex-direction: column;">
         {% if payment %}
-        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
             <div><strong>지급일:</strong> {{ payment.payment_date }}</div>
             <div><strong>지급계좌:</strong> {{ account.bank_name if account else '-' }} {{ account.account_number if account else '-' }}</div>
         </div>
@@ -112,8 +112,8 @@
             </tbody>
         </table>
         
-        <div style="text-align: center; margin-top: auto; padding: 20px; background-color: #e8f8f5; border-radius: 8px; border: 1px solid #2ecc71;">
-            <h2 style="margin: 0; color: #27ae60; font-size: 2em;">실 수령액: {{ payment.net_salary|comma }} 원</h2>
+        <div style="text-align: center; margin-top: auto; padding: 15px; background-color: #e8f8f5; border-radius: 8px; border: 1px solid #2ecc71;">
+            <h2 style="margin: 0; color: #27ae60; font-size: 1.6em;">실 수령액: {{ payment.net_salary|comma }} 원</h2>
         </div>
         {% else %}
         <div style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #7f8c8d;">
