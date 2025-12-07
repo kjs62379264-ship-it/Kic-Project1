@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 import math
 import uuid
 import requests
+import random
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' 
@@ -24,6 +25,10 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # ----------------------------------------------------
 # 0. 헬퍼 함수 및 필터 (계산 및 포맷팅)
 # ----------------------------------------------------
+# [추가] 연출용 시간 고정 함수
+def get_mock_now():
+    # 2025년 12월 11일 14시 30분으로 고정
+    return datetime(2025, 12, 11, 14, 30, 0)
 def get_real_weather():
     API_KEY = "d5d02c8ce25a904d5dd64a317fba7f14" 
     
@@ -355,9 +360,13 @@ def comma_filter(value):
 def datetimeformat(value, format='%Y년 %m월 %d일 %H:%M'):
     if isinstance(value, str):
         try: value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-        except ValueError: return value 
+        except: return value 
     if value is None: return ""
-    if value == 'now': value = datetime.now()
+    
+    # [수정] 'now'일 경우 모의 시간 사용
+    if value == 'now': 
+        value = get_mock_now()
+        
     return value.strftime(format)
 
 def calculate_deductions_logic(monthly_salary, non_taxable_amount=200000, rates=None):
@@ -496,8 +505,10 @@ def dashboard():
     # 1. 전체 직원 수
     total_employees_count = cursor.execute("SELECT COUNT(*) FROM employees WHERE id != 'admin'").fetchone()[0]
     
-    # 2. 근무 현황 통계 & 부재자 리스트
-    today_str = datetime.now().strftime('%Y-%m-%d')
+    # 2. 근무 현황 통계
+    # [수정]
+    now = get_mock_now()
+    today_str = now.strftime('%Y-%m-%d')
     cursor.execute("""
         SELECT e.id, e.name, e.department, e.position,
                COALESCE(a.attendance_status, '부재') as status,
@@ -505,74 +516,94 @@ def dashboard():
         FROM employees e
         LEFT JOIN attendance a ON e.id = a.employee_id AND a.record_date = ?
         WHERE e.id != 'admin' AND e.status = '재직'
-    """, (today_str,))
+    """, (today_str,)) # ✅ 이제 today_str가 정의되어 에러 안 남
+    
+    # ✅ [중요] 여기서 변수명은 'employees_status' 입니다.
     employees_status = cursor.fetchall()
     
-    status_counts = {'재실': 0, '휴가': 0, '외근/출장': 0, '부재': 0}
+    # 통계 집계 변수 초기화
+    status_counts = {
+        '출근': 0, '재실_상세': 0, '퇴근_상세': 0, 
+        '휴가': 0, '외근/출장': 0, '부재': 0
+    }
     absent_list = []
 
-    for emp in employees_status:
-        s = emp['status']
-        if emp['clock_in_time'] and not emp['clock_out_time']: s = '재실'
-        elif s in ['정상', '지각']: s = '재실'
-            
-        if s == '재실': status_counts['재실'] += 1
-        elif s == '휴가': status_counts['휴가'] += 1
-        elif s in ['외근', '출장']: status_counts['외근/출장'] += 1
-        else: status_counts['부재'] += 1
+    # ✅ [수정] 'rows' 대신 'employees_status'를 사용해야 합니다.
+    for row in employees_status:
+        d = dict(row)
         
-        if s != '재실':
-            badge_color = '#e74c3c' # 기본 레드
-            if s == '휴가': badge_color = '#3498db'
-            elif s in ['외근', '출장']: badge_color = '#f39c12'
+        # 1. 상태 판별 (우선순위: 퇴근 > 출근(재실) > 기타)
+        if d['clock_out_time']: 
+            real_status = '퇴근'
+        elif d['clock_in_time']:
+            real_status = '재실'
+        else:
+            # DB 상태 가져오기 (정상/지각 -> 재실로 보정)
+            db_status = d.get('status') # 쿼리에서 alias를 status로 줬음
+            if db_status in ['정상', '지각']: real_status = '재실'
+            else: real_status = db_status
+
+        # 2. 카운트 집계
+        if real_status == '재실':
+            status_counts['출근'] += 1
+            status_counts['재실_상세'] += 1
+        elif real_status == '퇴근':
+            status_counts['출근'] += 1
+            status_counts['퇴근_상세'] += 1
+        elif real_status == '휴가':
+            status_counts['휴가'] += 1
+        elif real_status in ['외근', '출장']:
+            status_counts['외근/출장'] += 1
+        else: # 나머지는 부재
+            status_counts['부재'] += 1
+            
+        # 부재자 리스트 생성 (재실/퇴근 제외)
+        if real_status not in ['재실', '퇴근']:
+            badge_color = '#e74c3c' # 기본 레드(부재)
+            if real_status == '휴가': badge_color = '#3498db'
+            elif real_status in ['외근', '출장']: badge_color = '#f39c12'
             
             absent_list.append({
-                'name': emp['name'], 'department': emp['department'], 'status': s, 'color': badge_color
+                'name': d['name'], 
+                'department': d['department'], 
+                'status': real_status, 
+                'color': badge_color
             })
 
     # 3. 공지사항
     notices = cursor.execute("SELECT * FROM notices ORDER BY created_at DESC LIMIT 5").fetchall()
     
     # 4. 부서별 차트
-    dept_stats = cursor.execute("SELECT department, COUNT(*) as count FROM employees WHERE status='재직' AND id!='admin' GROUP BY department ORDER BY count DESC").fetchall()
-    dept_labels = [row['department'] for row in dept_stats]
-    dept_counts = [row['count'] for row in dept_stats]
+    dept_stats = cursor.execute("SELECT department, COUNT(*) as c FROM employees WHERE status='재직' AND id!='admin' GROUP BY department ORDER BY c DESC").fetchall()
+    dept_labels = [row[0] for row in dept_stats]
+    dept_counts = [row[1] for row in dept_stats]
     
     # 5. 급여 정보 (본인)
     employee_id = g.user['id']
-    cursor.execute("SELECT base_salary FROM salary_contracts WHERE employee_id = ?", (employee_id,))
-    contract = cursor.fetchone()
+    contract = cursor.execute("SELECT base_salary FROM salary_contracts WHERE employee_id=?", (employee_id,)).fetchone()
     base_salary = contract['base_salary'] if contract else 0
 
-    cursor.execute("SELECT net_salary, payment_month FROM salary_payments WHERE employee_id = ? ORDER BY payment_year DESC, payment_month DESC LIMIT 1", (employee_id,))
-    payment = cursor.fetchone()
+    payment = cursor.execute("SELECT net_salary, payment_month FROM salary_payments WHERE employee_id=? ORDER BY payment_year DESC, payment_month DESC LIMIT 1", (employee_id,)).fetchone()
     last_net_salary = payment['net_salary'] if payment else 0
     last_payment_month = payment['payment_month'] if payment else 0
     
-    #6. 미니 캘린더 및 행사 데이터
-    
-    now = datetime.now()
-    current_year = now.year
-    current_month = now.month
-    
-    # 이번 달 달력 매트릭스 생성 (주 단위 리스트의 리스트)
-    # 예: [[0, 0, 1, 2, 3, 4, 5], [6, 7, ...], ...]
-    cal = calendar.Calendar(firstweekday=6) # 6 = 일요일부터 시작
-    month_calendar = cal.monthdayscalendar(current_year, current_month)
-    
-    # 행사 데이터 (DB에서 가져오거나 하드코딩)
-    # 날짜(day)를 키(key)로 하고 행사명(value)을 저장
-    events = {
-        25: "월급날 💰",
-        15: "가정의 날 👨‍👩‍👧‍👦",
-        # 오늘 날짜에 예시 이벤트 추가
-        now.day: "오늘 (Today)" 
-    }
-
     conn.close()
 
-    # ✅ [핵심] 날씨 데이터 가져오기 (상단에 정의한 함수 호출)
-    weather_data = get_real_weather() 
+    # 6. 날씨 및 달력 정보
+    weather_data = get_real_weather()
+    # [수정]
+    today = now = get_mock_now()
+    
+    # 달력 생성
+    cal = calendar.Calendar(firstweekday=6)
+    month_calendar = cal.monthdayscalendar(now.year, now.month)
+    
+    # 행사 데이터 (예시)
+    events = {
+        10: "월급날 💰",
+        15: "가정의 날 👨‍👩‍👧‍👦",
+        now.day: "오늘 (Today)"
+    }
     
     return render_template('dashboard.html', 
                            total_employees_count=total_employees_count,
@@ -587,8 +618,8 @@ def dashboard():
                            weather=weather_data,
                            month_calendar=month_calendar,
                            events=events,
-                           current_month=current_month,
-                           today_day=now.day) # ✅ 템플릿으로 전달
+                           current_month=now.month,
+                           today_day=now.day)
 @app.route('/')
 @login_required
 def root():
@@ -641,7 +672,7 @@ def inject_attendance_status():
 @login_required 
 def clock():
     emp_id = g.user['id']
-    now = datetime.now()
+    now = get_mock_now()
     
     # DB 저장용 및 비교용 변수
     today_str = now.date().strftime('%Y-%m-%d')
@@ -735,16 +766,20 @@ def clock():
         conn.close()
 
 @app.route('/attendance')
-@login_required
+@login_required 
 def attendance():
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # 1. 필터링
+    # 1. 필터링 파라미터 받기
     id_q = request.args.get('id', '')
     name_q = request.args.get('name', '')
-    
+    dept_q = request.args.get('department', '')
+    pos_q = request.args.get('position', '')
+    status_q = request.args.get('status', '')
+
+    # 2. 직원 목록 조회 쿼리
     sql = """
         SELECT e.id, e.name, e.department, e.position, 
                a.clock_in_time, a.clock_out_time, 
@@ -753,35 +788,102 @@ def attendance():
         LEFT JOIN attendance a ON e.id = a.employee_id AND a.record_date = ?
         WHERE e.status = '재직' AND e.id != 'admin'
     """
-    params = [datetime.now().strftime('%Y-%m-%d')]
     
+    query_date = request.args.get('date')
+    if not query_date: 
+        query_date = get_mock_now().strftime('%Y-%m-%d') # datetime.now() 아님
+    
+    params = [query_date]
+
     if id_q: sql += " AND e.id LIKE ?"; params.append(f"%{id_q}%")
     if name_q: sql += " AND e.name LIKE ?"; params.append(f"%{name_q}%")
+    if dept_q: sql += " AND e.department = ?"; params.append(dept_q)
+    if pos_q: sql += " AND e.position = ?"; params.append(pos_q)
+    
+    sql += " ORDER BY e.id ASC"
     
     cursor.execute(sql, params)
-    employees = [dict(row) for row in cursor.fetchall()]
+    rows = cursor.fetchall()
     
-    # 2. 통계
-    counts = {'재실': 0, '휴가': 0, '외근/출장': 0, '부재': 0}
-    for emp in employees:
-        s = emp['status']
-        if emp['clock_in_time'] and not emp['clock_out_time']: s = '재실'; emp['status'] = '재실'
-        elif s == '정상' or s == '지각': s = '재실'
+    employees = []
+    
+    # ✅ [핵심 복구] counts 변수 초기화
+    counts = {'출근': 0, '휴가': 0, '외근/출장': 0, '부재': 0}
+    
+    for row in rows:
+        d = dict(row)
         
-        if s in counts: counts[s] += 1
-        else: counts['부재'] += 1
+        # 상태 재계산 (퇴근 처리 로직 포함)
+        if d['clock_out_time']: 
+            d['status'] = '퇴근' # (리스트에는 '퇴근'으로 표시)
+        elif d['clock_in_time']: 
+            d['status'] = '재실'
+        elif d['status'] in ['정상', '지각']: 
+            d['status'] = '재실'
         
-        if emp['clock_in_time']: emp['check_in'] = emp['clock_in_time'][:5]
-        if emp['clock_out_time']: emp['check_out'] = emp['clock_out_time'][:5]
+        # ✅ [핵심 복구] 통계 집계 (퇴근도 '출근' 카운트에 포함)
+        # 화면의 '재실' 원(Circle)에는 '출근한 총 인원'을 보여주기로 했으므로
+        stat_status = d['status']
+        if d['status'] == '재실' or d['status'] == '퇴근': # 퇴근도 출근에 포함
+            counts['출근'] += 1
+        elif d['status'] == '휴가': 
+            counts['휴가'] += 1
+        elif d['status'] in ['외근', '출장']: 
+            counts['외근/출장'] += 1
+        else: 
+            counts['부재'] += 1
+        
+        # 시간 포맷팅
+        d['check_in'] = d['clock_in_time'][:5] if d['clock_in_time'] else '-'
+        d['check_out'] = d['clock_out_time'][:5] if d['clock_out_time'] else '-'
 
-    # 3. 휴가 요청
-    cursor.execute("SELECT * FROM vacation_requests WHERE status IN ('대기','승인', '반려') ORDER BY request_date DESC")
+        # 상태 필터링 (파이썬에서 처리)
+        # 퇴근 상태도 필터링에서 걸러지지 않도록 주의
+        filter_status = d['status']
+        if status_q and status_q != '-- 전체 --':
+            # 필터가 '재실'일 때 퇴근자도 포함할지 여부는 기획에 따라 다름. 
+            # 여기서는 정확히 일치하는 것만 보여줌.
+            if filter_status != status_q:
+                continue
+                
+        employees.append(d)
+
+    # 3. 휴가 요청 조회 (페이지네이션 적용)
+    page = request.args.get('page', 1, type=int)
+    per_page = 3 
+    offset = (page - 1) * per_page
+
+    cursor.execute("SELECT COUNT(*) FROM vacation_requests WHERE status IN ('대기','승인','반려')")
+    total_req_count = cursor.fetchone()[0]
+    total_pages = math.ceil(total_req_count / per_page)
+
+    cursor.execute("""
+        SELECT * FROM vacation_requests 
+        WHERE status IN ('대기','승인','반려') 
+        ORDER BY request_date DESC 
+        LIMIT ? OFFSET ?
+    """, (per_page, offset))
     reqs = cursor.fetchall()
     
+    # 4. 부서 및 직급 목록 조회
+    depts_rows = cursor.execute("SELECT name FROM departments ORDER BY name").fetchall()
+    depts = [row['name'] for row in depts_rows]
+    
+    pos_rows = cursor.execute("SELECT name FROM positions").fetchall()
+    pos = [row['name'] for row in pos_rows]
+    
     conn.close()
-    return render_template('attendance_page.html', employees=employees, status_counts=counts, 
-                           vacation_requests=reqs, total_employees_count=len(employees),
-                           departments=[], positions=[])
+    
+    return render_template('attendance_page.html', 
+                           employees=employees, 
+                           status_counts=counts, # ✅ 이제 counts 변수가 있으므로 에러 없음
+                           vacation_requests=reqs, 
+                           total_employees_count=len(employees),
+                           departments=depts, 
+                           positions=pos,
+                           current_page=page,
+                           total_pages=total_pages
+                           )
 
 @app.route('/attendance/detail/<employee_id>')
 @login_required
@@ -831,81 +933,81 @@ def attendance_detail(employee_id):
 def my_attendance():
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    cur = conn.cursor()
     
-    # 1. 날짜 파라미터 처리
-    year = request.args.get('year', datetime.now().year, type=int)
-    month = request.args.get('month', datetime.now().month, type=int)
+    mock_now = get_mock_now()
+    year = request.args.get('year', mock_now.year, type=int)
+    month = request.args.get('month', mock_now.month, type=int)
     
-    start_date = f"{year}-{month:02d}-01"
-    last_day = calendar.monthrange(year, month)[1]
-    end_date = f"{year}-{month:02d}-{last_day}"
+    # ✅ [핵심 수정] 필터 기본값을 '2025-12-01' ~ '2025-12-11'로 설정
+    default_start = "2025-12-01"
+    default_end = "2025-12-11"
     
-    # 2. 필터링 파라미터 (선택 사항)
-    f_start = request.args.get('start_date')
-    f_end = request.args.get('end_date')
-    f_status = request.args.get('status_filter')
+    start_date_filter = request.args.get('start_date')
+    end_date_filter = request.args.get('end_date')
     
-    # 3. 기간 내 근태 기록 조회
-    sql = "SELECT * FROM attendance WHERE employee_id = ? AND record_date BETWEEN ? AND ? ORDER BY record_date DESC"
-    cursor.execute(sql, (g.user['id'], start_date, end_date))
-    rows = cursor.fetchall()
+    # 조회용 변수 (필터가 없으면 기본값 사용)
+    s_date = start_date_filter if start_date_filter else default_start
+    e_date = end_date_filter if end_date_filter else default_end
+    status_filter = request.args.get('status_filter')
+
+    # DB 조회
+    sql = "SELECT * FROM attendance WHERE employee_id = ? AND record_date BETWEEN ? AND ?"
+    params = [g.user['id'], s_date, e_date]
     
-    records = []
-    calendar_data = []
-    
-    for row in rows:
-        d = dict(row)
-        # 필터링 적용
-        if f_start and d['record_date'] < f_start: continue
-        if f_end and d['record_date'] > f_end: continue
-        if f_status and d['attendance_status'] != f_status: continue
+    if status_filter:
+        sql += " AND attendance_status = ?"
+        params.append(status_filter)
         
+    sql += " ORDER BY record_date DESC"
+    
+    rows = cur.execute(sql, params).fetchall()
+    recs = []
+    daily_attendance = {}
+    
+    for r in rows:
+        d = dict(r)
         d['date'] = d['record_date']
         d['clock_in'] = d['clock_in_time'][:5] if d['clock_in_time'] else '-'
         d['clock_out'] = d['clock_out_time'][:5] if d['clock_out_time'] else '-'
         d['duration'] = calculate_work_duration(d['clock_in_time'], d['clock_out_time'])
         d['status'] = d['attendance_status']
-        records.append(d)
+        d['note'] = d['note'] # 비고 추가
+        recs.append(d)
         
-        calendar_data.append({'record_date': datetime.strptime(d['record_date'], '%Y-%m-%d').date(), 'attendance_status': d['status']})
+        # 달력 데이터
+        r_date = datetime.strptime(d['record_date'], '%Y-%m-%d')
+        day_int = r_date.day
+        css = 'status-normal'
+        if d['status'] == '지각': css = 'status-late'
+        elif d['status'] == '휴가': css = 'status-leave'
+        elif d['status'] in ['결근', '부재']: css = 'status-absent'
+        
+        daily_attendance[day_int] = {'status': d['status'], 'clock_in': d['clock_in'], 'clock_out': d['clock_out'], 'css_class': css}
 
-    # 4. ✅ [핵심] 통계 계산 함수 호출 (상단에 정의한 함수 사용)
     stats = calculate_monthly_stats(g.user['id'], year, month)
+    m_stats = {'remaining_leave': 12.0, 'late_count': stats['late_count'], 'extended_work': stats['extended_str'], 'night_work': stats['night_str']}
     
-    # 템플릿용 통계 데이터 재구성
-    monthly_stats = {
-        'remaining_leave': 12.0,               # (임시) 잔여 연차
-        'late_count': stats['late_count'],     # 지각 횟수
-        'extended_work': stats['extended_str'], # 연장+주말 근무 시간
-        'night_work': stats['night_str']        # 야간 근무 시간
-    }
-    
-    # 5. ✅ [복구] 오늘의 근무 요약 데이터 조회 (이게 없으면 하단 좌측 카드가 비어보임)
     today_rec = get_today_attendance(g.user['id'])
-    today_status = today_rec['attendance_status'] if today_rec else '미등록'
     
-    cal_html = create_attendance_calendar(year, month, calendar_data)
+    # 달력 구조
+    cal = calendar.Calendar(firstweekday=6)
+    month_calendar = cal.monthdayscalendar(year, month)
+    
     conn.close()
     
     return render_template('my_attendance.html', 
-                           attendance_records=records, 
-                           calendar_html=cal_html,
-                           current_year=year, 
-                           current_month=month, 
-                           current_month_name=f"{year}년 {month}월",
-                           
-                           # ✅ [수정] stats 대신 monthly_stats를 전달해야 함!
-                           monthly_stats=monthly_stats, 
-                           
-                           # ✅ [복구] 오늘의 데이터 전달
+                           attendance_records=recs, 
+                           month_calendar=month_calendar, 
+                           daily_attendance=daily_attendance,
+                           current_year=year, current_month=month, current_month_name=f"{year}년 {month}월",
+                           monthly_stats=m_stats, 
                            today_record=today_rec or {}, 
-                           today_status=today_status,
-                           
-                           # 필터 값 유지
-                           start_date_filter=f_start,
-                           end_date_filter=f_end,
-                           status_filter_value=f_status)
+                           today_status=today_rec['attendance_status'] if today_rec else '미등록',
+                           # ✅ 필터 값 전달 (화면에 표시용)
+                           start_date_filter=s_date,
+                           end_date_filter=e_date,
+                           status_filter_value=status_filter)
 
 @app.route('/vacation_request', methods=['GET', 'POST'])
 @login_required
@@ -972,7 +1074,26 @@ def attendance_employee():
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
     
-    cur.execute("""
+    # 1. 날짜 파라미터 처리 (기본값: 모의 날짜 12월 11일)
+    # ✅ [핵심] 사용자가 선택한 년/월을 받아서 변수에 저장
+    mock_now = get_mock_now()
+    year = request.args.get('year', mock_now.year, type=int)
+    month = request.args.get('month', mock_now.month, type=int)
+    
+    # 2. 검색 필터 파라미터
+    id_query = request.args.get('id_query', '')
+    name_query = request.args.get('name_query', '')
+    dept_query = request.args.get('department_query', '')
+    pos_query = request.args.get('position_query', '')
+    
+    leave_filter = request.args.get('leave_filter', '')
+    late_absent_filter = request.args.get('late_absent_filter', '') # 통합 필터
+    overtime_filter = request.args.get('overtime_filter', '')
+
+    # 3. 기본 쿼리 (선택된 년-월 기준)
+    target_ym = f"{year}-{month:02d}"
+    
+    sql = """
         SELECT e.id, e.name, e.department, e.position,
                COUNT(CASE WHEN a.attendance_status = '지각' THEN 1 END) as late_count,
                COUNT(CASE WHEN a.attendance_status = '결근' THEN 1 END) as absence_count
@@ -980,16 +1101,78 @@ def attendance_employee():
         LEFT JOIN attendance a ON e.id = a.employee_id 
              AND strftime('%Y-%m', a.record_date) = ?
         WHERE e.status = '재직' AND e.id != 'admin'
-        GROUP BY e.id
-    """, (datetime.now().strftime('%Y-%m'),))
+    """
+    params = [target_ym] # ✅ 선택된 월로 쿼리 실행
+
+    if id_query: sql += " AND e.id LIKE ?"; params.append(f"%{id_query}%")
+    if name_query: sql += " AND e.name LIKE ?"; params.append(f"%{name_query}%")
+    if dept_query: sql += " AND e.department = ?"; params.append(dept_query)
+    if pos_query: sql += " AND e.position = ?"; params.append(pos_query)
     
-    stats = [dict(row) for row in cur.fetchall()]
-    for s in stats: 
-        s['remaining_leave'] = 15
-        s['overtime_hours'] = 0
+    sql += " GROUP BY e.id ORDER BY e.id ASC"
+    
+    rows = cur.execute(sql, params).fetchall()
+    
+    stats = []
+    for row in rows:
+        d = dict(row)
         
+        # -----------------------------------------------------------
+        # [데이터 정합성 확보] 상세 페이지와 동일한 로직 적용
+        # -----------------------------------------------------------
+        # 1. DB 데이터 조회 (실제 휴가 사용) - 연도 기준
+        db_used_leave = cur.execute("""
+            SELECT COUNT(*) FROM attendance 
+            WHERE employee_id = ? AND attendance_status = '휴가' AND strftime('%Y', record_date) = ?
+        """, (d['id'], str(year))).fetchone()[0]
+
+        # 2. 랜덤 시드 고정
+        rd = random.Random(d['id']) 
+        
+        # 3. 가상 데이터 생성 (상세 페이지와 순서 일치)
+        past_late = rd.randint(0, 3)
+        past_leave = rd.randint(2, 8)
+        past_trip = rd.randint(0, 5)
+        past_out = rd.randint(0, 5)
+        past_ov_days = rd.randint(0, 10)
+        past_ov_sec = rd.randint(0, 36000)
+
+        # 4. 잔여 연차
+        total_annual_leave = 15.0
+        real_used_leave = db_used_leave + past_leave
+        remaining = total_annual_leave - real_used_leave
+        d['remaining_leave'] = f"{remaining:.1f}"
+        
+        # 5. 초과 근무
+        ov_h = past_ov_sec // 3600
+        ov_m = (past_ov_sec % 3600) // 60
+        d['overtime_hours'] = f"{ov_h}시간 {ov_m}분"
+        
+        # (필터링 로직)
+        if leave_filter:
+            if leave_filter == '5' and remaining < 5: continue
+            if leave_filter == '10' and remaining < 10: continue
+        if overtime_filter:
+            if overtime_filter == '1' and ov_h < 1: continue
+            if overtime_filter == '10' and ov_h < 10: continue
+        if late_absent_filter:
+            total_issues = d['late_count'] + d['absence_count']
+            if int(late_absent_filter) > total_issues: continue
+
+        stats.append(d)
+        
+    depts = [r[0] for r in cur.execute("SELECT name FROM departments ORDER BY name").fetchall()]
+    pos = [r[0] for r in cur.execute("SELECT name FROM positions").fetchall()]
+    
     conn.close()
-    return render_template('attendance_employee.html', employee_stats=stats, current_month=datetime.now().month)
+    
+    return render_template('attendance_employee.html', 
+                           employee_stats=stats, 
+                           # ✅ [핵심 수정] 선택된 year와 month를 템플릿으로 전달
+                           current_year=year,
+                           current_month=month,
+                           departments=depts, 
+                           positions=pos)
 
 @app.route('/attendance_employee_detail/<employee_id>')
 @login_required
@@ -1005,49 +1188,98 @@ def attendance_employee_detail(employee_id):
         conn.close()
         return redirect(url_for('attendance_employee'))
 
-    # 1. 사용자 요청(URL 파라미터)에서 연/월 가져오기
-    year = request.args.get('year', datetime.now().year, type=int)
-    month = request.args.get('month', datetime.now().month, type=int)
-    start_date = date(year, month, 1)
+    # ✅ [핵심 추가] 어디서 왔는지 확인 (기본값: employee_list)
+    source = request.args.get('source', 'employee_list')
 
-    # 2. 통계 데이터 계산 (남은 연차 등 포함)
-    # (실제 DB 쿼리는 생략하고 로직만 유지합니다. 필요시 calculate_monthly_stats 활용 가능)
-    total_annual_leave = 15.0
-    used_leave_yearly = 0 
-
-    employee_stats_summary = {
-        # ✅ [수정] 현재 시간이 아니라, 선택된 year/month를 사용하도록 변경!
-        'target_month': f"{year}년 {month}월",
-        'target_year': year,
+    mock_now = get_mock_now()
+    year = request.args.get('year', mock_now.year, type=int)
+    month = request.args.get('month', mock_now.month, type=int)
+    s_date = f"{year}-{month:02d}-01"
+    e_date = f"{year}-{month:02d}-{calendar.monthrange(year, month)[1]}"
+    
+    # [1] 월간 실적
+    rows = cursor.execute("SELECT * FROM attendance WHERE employee_id=? AND record_date BETWEEN ? AND ?", (employee_id, s_date, e_date)).fetchall()
+    m_stats = {'late':0,'absent':0,'leave':0,'trip':0,'out':0,'ov_days':0,'ov_sec':0}
+    daily_attendance = {}
+    
+    for r in rows:
+        st = r['attendance_status']; nt = r['note'] or ''
+        if st=='지각': m_stats['late']+=1
+        elif st=='결근': m_stats['absent']+=1
+        elif st=='휴가': m_stats['leave']+=1
+        elif st=='출장': m_stats['trip']+=1
+        elif st=='외근': m_stats['out']+=1
         
+        if '연장' in nt or '야간' in nt or '주말' in nt:
+            m_stats['ov_days']+=1
+            random.seed(r['id'])
+            m_stats['ov_sec']+=random.randint(7200, 14400)
+            
+        try:
+            rd = datetime.strptime(r['record_date'], '%Y-%m-%d'); day = rd.day
+            css = 'status-normal'
+            if st=='지각': css='status-late'
+            elif st=='휴가': css='status-leave'
+            elif st in ['결근','부재']: css='status-absent'
+            
+            cin = r['clock_in_time'][:5] if r['clock_in_time'] else '-'
+            cout = r['clock_out_time'][:5] if r['clock_out_time'] else '-'
+            daily_attendance[day] = {'status':st, 'clock_in':cin, 'clock_out':cout, 'css_class':css}
+        except: pass
+
+    # [2] 연간 실적
+    year_rows = cursor.execute("SELECT * FROM attendance WHERE employee_id=? AND strftime('%Y', record_date)=?", (employee_id, str(year))).fetchall()
+    y_stats = {'late':0,'absent':0,'leave':0,'trip':0,'out':0,'ov_days':0,'ov_sec':0}
+    for r in year_rows:
+        st = r['attendance_status']; nt = r['note'] or ''
+        if st=='지각': y_stats['late']+=1
+        elif st=='결근': y_stats['absent']+=1
+        elif st=='휴가': y_stats['leave']+=1
+        elif st=='출장': y_stats['trip']+=1
+        elif st=='외근': y_stats['out']+=1
+        if '연장' in nt or '야간' in nt or '주말' in nt:
+            y_stats['ov_days']+=1; random.seed(r['id']); y_stats['ov_sec']+=random.randint(7200, 14400)
+
+    # 가상 데이터 (목록과 동일 시드)
+    rd = random.Random(employee_id) 
+    y_stats['late'] += rd.randint(0, 3)
+    past_leave = rd.randint(2, 6)
+    y_stats['leave'] += past_leave
+    y_stats['trip'] += rd.randint(0, 5)
+    y_stats['out'] += rd.randint(0, 5)
+    y_stats['ov_days'] += rd.randint(0, 10)
+    y_stats['ov_sec'] += rd.randint(0, 36000)
+
+    def fmt_time(s): return f"{s//3600}h {(s%3600)//60}m"
+
+    total_leave = 15.0
+    used_leave = y_stats['leave']
+    remaining = total_leave - used_leave
+
+    summary = {
+        'target_month': f"{year}년 {month}월", 'target_year': year,
         'monthly': {
-            'tardy_count': 0, 'absent_count': 0, 
-            'offsite_days': 0, 'business_trip_days': 0, 
-            'leave_days': 0, 
-            'overtime_hours': '0h 0m', 'overtime_days_count': 0
+            'tardy_count': m_stats['late'], 'absent_count': m_stats['absent'], 
+            'offsite_days': m_stats['out'], 'business_trip_days': m_stats['trip'], 
+            'leave_days': m_stats['leave'], 'overtime_hours': fmt_time(m_stats['ov_sec']), 'overtime_days_count': m_stats['ov_days']
         },
         'yearly': {
-            'tardy_count': 0, 'absent_count': 0, 
-            'offsite_days': 0, 'business_trip_days': 0, 
-            'leave_days': used_leave_yearly, 
-            'remaining_leave': total_annual_leave - used_leave_yearly,
-            'overtime_hours': '0h 0m', 'overtime_days_count': 0
+            'tardy_count': y_stats['late'], 'absent_count': y_stats['absent'], 
+            'offsite_days': y_stats['out'], 'business_trip_days': y_stats['trip'], 
+            'leave_days': used_leave, 'remaining_leave': f"{remaining:.1f}",
+            'overtime_hours': fmt_time(y_stats['ov_sec']), 'overtime_days_count': y_stats['ov_days']
         }
     }
     
-    calendar_records = []
-    calendar_html = create_attendance_calendar(year, month, calendar_records)
-    
+    cal = calendar.Calendar(firstweekday=6); m_cal = cal.monthdayscalendar(year, month)
     conn.close()
 
     return render_template('attendance_employee_detail.html', 
                            target_user=target_user, 
-                           employee_stats_summary=employee_stats_summary, 
-                           calendar_html=calendar_html, 
-                           current_year=year, 
-                           current_month=month, 
-                           current_month_name=f"{year}년 {month}월")
-
+                           employee_stats_summary=summary, 
+                           month_calendar=m_cal, daily_attendance=daily_attendance, 
+                           current_year=year, current_month=month, current_month_name=f"{year}년 {month}월",
+                           source=source) # ✅ source 전달
 @app.route('/attendance_request')
 @login_required
 @admin_required
@@ -1095,51 +1327,58 @@ def attendance_request():
 # ----------------------------------------------------
 @app.route('/attendance/update', methods=['POST'])
 @login_required
-@admin_required
+@admin_required 
 def update_attendance():
-    employee_id = request.form['employee_id']
-    record_date = request.form['record_date']
-    clock_in_time = request.form['clock_in_time']
-    clock_out_time = request.form['clock_out_time']
+    employee_id = request.form.get('employee_id')
+    record_date = request.form.get('record_date')
+    clock_in = request.form.get('clock_in_time')
+    clock_out = request.form.get('clock_out_time')
     
-    # 빈 값 처리 (None으로 저장하거나, '-'이면 NULL 처리)
-    # time type input은 값이 없으면 ''(빈 문자열)을 보냅니다.
-    
-    # HH:MM 형식이므로 초(:00)를 붙여서 저장하는 것이 일반적입니다.
-    if clock_in_time: clock_in_time += ":00"
-    if clock_out_time: clock_out_time += ":00"
-    
+    # ✅ [신규] 상태 값 받기
+    new_status = request.form.get('attendance_status')
+
+    # 시간 포맷 처리 (빈 문자열이면 None으로 저장)
+    # HTML time input은 'HH:MM' 형식이지만 DB는 'HH:MM:SS'를 쓸 수 있으므로 초(:00) 추가
+    if clock_in: 
+        if len(clock_in) == 5: clock_in += ':00'
+    else: clock_in = None
+        
+    if clock_out:
+        if len(clock_out) == 5: clock_out += ':00'
+    else: clock_out = None
+
     conn = sqlite3.connect('employees.db')
     cursor = conn.cursor()
     
     try:
-        # 해당 날짜의 기록이 있는지 확인
-        cursor.execute("SELECT id FROM attendance WHERE employee_id = ? AND record_date = ?", (employee_id, record_date))
-        exists = cursor.fetchone()
+        # 해당 날짜 기록이 있는지 확인
+        cursor.execute("SELECT id FROM attendance WHERE employee_id=? AND record_date=?", (employee_id, record_date))
+        row = cursor.fetchone()
         
-        if exists:
-            # 있으면 업데이트
+        if row:
+            # ✅ [수정] 상태(status)도 함께 업데이트
             cursor.execute("""
                 UPDATE attendance 
-                SET clock_in_time = ?, clock_out_time = ?, attendance_status = '수정됨'
-                WHERE id = ?
-            """, (clock_in_time, clock_out_time, exists[0]))
+                SET clock_in_time=?, clock_out_time=?, attendance_status=? 
+                WHERE id=?
+            """, (clock_in, clock_out, new_status, row[0]))
         else:
-            # 없으면 새로 생성 (관리자가 강제 기록)
+            # 기록 없으면 새로 생성 (거의 없을 케이스지만 안전장치)
             cursor.execute("""
                 INSERT INTO attendance (employee_id, record_date, clock_in_time, clock_out_time, attendance_status)
-                VALUES (?, ?, ?, ?, '수정됨')
-            """, (employee_id, record_date, clock_in_time, clock_out_time))
+                VALUES (?, ?, ?, ?, ?)
+            """, (employee_id, record_date, clock_in, clock_out, new_status))
             
         conn.commit()
-        flash(f"{employee_id} 직원의 근태 기록이 수정되었습니다.", "success")
+        flash("근태 기록이 수정되었습니다.", "success")
         
     except Exception as e:
         conn.rollback()
-        flash(f"수정 중 오류 발생: {e}", "error")
+        flash(f"수정 실패: {e}", "error")
     finally:
         conn.close()
         
+    # 원래 페이지로 돌아가기
     return redirect(url_for('attendance'))
 @app.route('/attendance/process/<int:request_id>/<action>', methods=['POST'])
 @login_required
@@ -1891,93 +2130,44 @@ def calculate_all_salary():
 @app.route('/my_salary')
 @login_required
 def my_salary():
-    conn = sqlite3.connect('employees.db')
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
+    employee_id = g.user['id']
+    conn = sqlite3.connect('employees.db'); conn.row_factory = sqlite3.Row; cur = conn.cursor()
     
-    user_id = g.user['id']
+    # 1. 현재 시간 기준 (모의 시간)
+    now = get_mock_now()
     
-    # ---------------------------------------------------------
-    # 1. 입사일 기준 조회 가능한 날짜 리스트 생성 (입사월 ~ 현재)
-    # ---------------------------------------------------------
-    try:
-        # DB의 hire_date 문자열(YYYY-MM-DD)을 날짜 객체로 변환
-        hire_date = datetime.strptime(g.user['hire_date'], '%Y-%m-%d')
-    except:
-        # 입사일 오류 시 현재 날짜를 기준으로 처리 (방어 코드)
-        hire_date = datetime.now()
+    # 2. URL 파라미터 받기 (기본값: 이번 달)
+    # 사용자가 year, month를 선택해서 [이동]을 누르면 이 값이 들어옵니다.
+    selected_year = request.args.get('year', now.year, type=int)
+    selected_month = request.args.get('month', now.month, type=int)
 
-    today = datetime.now()
-    available_periods = []
-
-    # 입사일의 '월' 1일부터 시작 ~ 현재 날짜의 '월' 1일까지 반복
-    # 예: 24년 3월 입사 -> 24-3, 24-4, ... 25-12
-    curr = hire_date.replace(day=1)
-    end = today.replace(day=1)
-
-    while curr <= end:
-        available_periods.append((curr.year, curr.month))
-        curr += relativedelta(months=1)
-
-    # 최신 날짜가 위로 오도록 정렬 (내림차순)
-    available_periods.reverse()
-
-    # ---------------------------------------------------------
-    # 2. 사용자가 선택한 날짜 처리 (Dropdown 값)
-    # ---------------------------------------------------------
-    selected_year = None
-    selected_month = None
-    
-    # HTML form에서 name="period"로 넘겨준 값 (예: "2024-5") 받기
-    period = request.args.get('period') 
-    
-    if period:
-        try:
-            y_str, m_str = period.split('-')
-            selected_year = int(y_str)
-            selected_month = int(m_str)
-        except:
-            pass # 파싱 에러 시 무시
-
-    # 선택값이 없거나(처음 접속), 잘못된 값이면 -> "가장 최신 날짜"로 자동 설정
-    if not selected_year or not selected_month:
-        if available_periods:
-            selected_year, selected_month = available_periods[0]
-        else:
-            selected_year, selected_month = today.year, today.month
-
-    # ---------------------------------------------------------
-    # 3. DB 조회
-    # ---------------------------------------------------------
-    
-    # (1) 선택된 연/월의 급여 정보 (단건 조회)
+    # 3. 해당 연/월의 급여 내역 조회
     cur.execute("""
-        SELECT * FROM salary_payments
+        SELECT * FROM salary_payments 
         WHERE employee_id = ? AND payment_year = ? AND payment_month = ?
-    """, (user_id, selected_year, selected_month))
-    payment = cur.fetchone() 
-
-    # (2) 전체 급여 이력 조회 (하단 리스트용 - 그대로 유지)
-    cur.execute("""
-        SELECT * FROM salary_payments
-        WHERE employee_id = ?
-        ORDER BY payment_year DESC, payment_month DESC
-    """, (user_id,))
-    history = cur.fetchall()
-
-    # (3) 계좌 정보 조회
-    cur.execute("SELECT bank_name, account_number FROM salary_contracts WHERE employee_id=?", (user_id,))
+    """, (employee_id, selected_year, selected_month))
+    payment = cur.fetchone()
+    
+    # 4. 계좌 정보 조회
+    cur.execute("SELECT * FROM salary_contracts WHERE employee_id = ?", (employee_id,))
     account = cur.fetchone()
-
+    
+    # 5. 전체 급여 이력 조회 (우측 리스트용)
+    history = cur.execute("""
+        SELECT * FROM salary_payments 
+        WHERE employee_id = ? 
+        ORDER BY payment_year DESC, payment_month DESC
+    """, (employee_id,)).fetchall()
+    
     conn.close()
     
     return render_template('my_salary.html', 
                            payment=payment, 
-                           history=history, 
-                           account=account,
-                           available_periods=available_periods, # [핵심] 날짜 리스트 전달
-                           selected_year=selected_year,         # [핵심] 현재 보여주는 연도
-                           selected_month=selected_month)       # [핵심] 현재 보여주는 월
+                           account=account, 
+                           history=history,
+                           # 템플릿으로 선택된 연/월 전달
+                           selected_year=selected_year,
+                           selected_month=selected_month)
 
 @app.route('/salary/print/<int:payment_id>')
 @login_required
@@ -2259,40 +2449,52 @@ def my_page():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
+    # 1. 급여 계약 정보
     cursor.execute("SELECT * FROM salary_contracts WHERE employee_id = ?", (employee_id,))
     contract = cursor.fetchone()
     
-    current_month_str = datetime.now().strftime('%Y-%m')
+    # ✅ [핵심 수정] 현재 시간 대신 '모의 시간(12월 11일)' 사용
+    now = get_mock_now()
     
-    cursor.execute("""
-        SELECT 
-            COUNT(CASE WHEN attendance_status = '지각' THEN 1 END) as late_count,
-            COUNT(CASE WHEN attendance_status = '결근' THEN 1 END) as absent_count
-        FROM attendance 
-        WHERE employee_id = ? AND strftime('%Y-%m', record_date) = ?
-    """, (employee_id, current_month_str))
-    month_row = cursor.fetchone()
+    # 2. 이번 달 상세 통계 계산 (헬퍼 함수 사용)
+    # calculate_monthly_stats 함수가 연장/야간 시간을 계산해서 줍니다.
+    stats = calculate_monthly_stats(employee_id, now.year, now.month)
     
+    # 3. DB에서 결근 횟수 등 추가 조회
+    current_month_str = now.strftime('%Y-%m')
+    current_year_str = now.strftime('%Y')
+    
+    # 이번 달 결근
+    cursor.execute("SELECT COUNT(*) FROM attendance WHERE employee_id=? AND attendance_status='결근' AND strftime('%Y-%m', record_date)=?", (employee_id, current_month_str))
+    month_absent = cursor.fetchone()[0]
+
+    # 올해 누적 (지각/결근)
+    cursor.execute("SELECT COUNT(CASE WHEN attendance_status='지각' THEN 1 END) as late, COUNT(CASE WHEN attendance_status='결근' THEN 1 END) as absent FROM attendance WHERE employee_id=? AND strftime('%Y', record_date)=?", (employee_id, current_year_str))
+    year_row = cursor.fetchone()
+    
+    # 4. 템플릿으로 보낼 데이터 구성
     monthly_stats = {
-        'late_count': month_row['late_count'],
-        'absent_count': month_row['absent_count'],
-        'overtime_hours': '0h 0m',
-        'overtime_days': 0        
+        'late_count': stats['late_count'],      # 헬퍼 함수 결과 사용
+        'absent_count': month_absent,
+        'overtime_hours': stats['extended_str'], # ✅ 연장/주말 근무 시간 (DB 기반)
+        'overtime_days': 0,  # (일수는 일단 0으로 둠)
+        'night_work': stats['night_str']         # ✅ 야간 근무 시간 (DB 기반)
     }
 
     yearly_stats = {
-        'late_count': month_row['late_count'] + 2, 
-        'absent_count': month_row['absent_count'],
-        'overtime_hours': '12h 30m',
+        'late_count': year_row['late'],
+        'absent_count': year_row['absent'],
+        'overtime_hours': '12h 30m', # (올해 누적은 임시 데이터 유지)
         'overtime_days': 5
     }
     
     remaining_leave = 12.0 
 
+    # 5. 근속 기간 계산 (모의 날짜 기준)
     tenure_text = ""
     try:
         hire_date = datetime.strptime(g.user['hire_date'], '%Y-%m-%d')
-        diff = relativedelta(datetime.now(), hire_date)
+        diff = relativedelta(now, hire_date) # ✅ now 사용
         if diff.years > 0: tenure_text = f"({diff.years}년 {diff.months}개월차)"
         elif diff.months == 0: tenure_text = "(신입)"
         else: tenure_text = f"({diff.months}개월차)"

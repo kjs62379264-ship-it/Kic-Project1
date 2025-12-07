@@ -6,7 +6,7 @@
 
 {% block custom_styles %}
 <style>
-    /* 토스트 알림 스타일 (화면 상단 고정) */
+    /* Toast Notification Styles (Fixed at top center) */
     .flash-messages-container {
         position: fixed;
         top: 20px;
@@ -31,7 +31,7 @@
         opacity: 1;
         transform: translateY(0);
     }
-    /* 알림 색상 */
+    /* Alert Colors */
     .alert-danger { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     .alert-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .alert-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
@@ -54,7 +54,7 @@
 
     <div class="main-container">
         
-        {# 2. 사이드바 (로그인 시에만 표시) #}
+        {# 2. Sidebar (Visible only when logged in) #}
         {% if g.user %}
         <aside class="sidebar">
             <div class="profile-area">
@@ -83,14 +83,17 @@
                     <li>
                         <a href="{{ url_for('dashboard') }}">메인 화면</a>
                     </li>
+                    
                     <li class="has-submenu">
                         <a href="javascript:void(0);">인사 관리</a>
                         <ul class="submenu-info">
                             <li><a href="{{ url_for('hr_management') }}">- 직원 명부</a></li>
+                            
                             {% if g.user.role == 'admin' %}
                             <li><a href="{{ url_for('add_employee') }}">- 신규 직원 등록</a></li>
-                            <li><a href="{{ url_for('print_employees', **request.args) }}" target="_blank">- 명부 인쇄</a></li>
-                            <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리</a></li>
+                            
+                            <li style="border-top: 1px solid #eee; margin: 5px 0;"></li>
+                            <li><a href="{{ url_for('settings_management') }}">- 부서/직급 관리 (관리)</a></li>
                             {% endif %}
                         </ul>
                     </li>
@@ -134,35 +137,35 @@
         {% endif %} 
         
         <main class="content-grid">
-        {% block page_content %}
-        {% endblock %}
-    </main>
-</div>
+            {% block page_content %}
+            {% endblock %}
+        </main>
+    </div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         
         // -------------------------------------------------------
-        // 1. 사이드바 메뉴 토글 (클릭 시 열림/닫힘) - [누락된 부분 복구]
+        // 1. Sidebar Menu Toggle (Click to Open/Close)
         // -------------------------------------------------------
         const menuToggles = document.querySelectorAll('.sidebar .has-submenu > a');
 
         menuToggles.forEach(toggle => {
             toggle.addEventListener('click', function(e) {
-                // href가 없거나 javascript:void(0)인 경우만 토글 동작 (상위 메뉴)
+                // Only toggle if href is empty or javascript:void(0) (Parent menu)
                 const href = this.getAttribute('href');
                 if (!href || href === '#' || href === 'javascript:void(0);') {
-                    e.preventDefault(); // 페이지 이동 방지
+                    e.preventDefault(); // Prevent page navigation
                     const parentLi = this.parentElement;
                     
-                    // ✅ [핵심] 'open' 클래스를 토글 (CSS의 .sidebar .has-submenu.open 과 일치해야 함)
+                    // Toggle 'open' class (Must match CSS .sidebar .has-submenu.open)
                     parentLi.classList.toggle('open'); 
                 }
             });
         });
 
         // -------------------------------------------------------
-        // 2. 토스트 알림 애니메이션 - [누락된 부분 복구]
+        // 2. Toast Notification Animation
         // -------------------------------------------------------
         const alerts = document.querySelectorAll('.flash-messages-container .alert');
         alerts.forEach(alert => {
@@ -174,7 +177,7 @@
         });
 
         // -------------------------------------------------------
-        // 3. 출퇴근 버튼 AJAX 처리 (기존 로직 유지)
+        // 3. Clock In/Out Button AJAX Processing
         // -------------------------------------------------------
         const clockForm = document.querySelector('#clock-form');
         const clockBtn = document.querySelector('.attendance-section .attendance-btn');
@@ -221,7 +224,7 @@
     });
 
     // -------------------------------------------------------
-    // 4. 전역 유틸리티 함수 (달력 이동 등)
+    // 4. Global Utility Functions (Calendar Navigation, etc.)
     // -------------------------------------------------------
     function changeMonth(year, month) {
         if (month < 1) { year -= 1; month = 12; }
@@ -233,7 +236,7 @@
     }
 </script>
 
-{# ✅ [매우 중요] 자식 템플릿(vacation_request 등)의 스크립트가 들어갈 자리 #}
+{# Placeholder for child template scripts #}
 {% block scripts %}{% endblock %}
 
 {% endblock %}

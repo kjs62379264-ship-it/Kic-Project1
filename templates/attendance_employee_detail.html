@@ -5,20 +5,18 @@
 
 {% block custom_styles %}
 <style>
-    /* 1. 화면 전체 꽉 채우기 레이아웃 */
+    /* 1. 화면 꽉 채우기 레이아웃 */
     .content-grid {
         height: 100%;
         overflow: hidden; 
         padding-bottom: 0; 
         display: grid;
         grid-template-columns: 1fr;
-        
-        /* ✅ 상단(통계) / 하단(달력) 1:1 비율 고정 */
-        grid-template-rows: 0.92fr 1.08fr; 
+        grid-template-rows: 1fr 1fr; /* 상하 1:1 분할 */
         gap: 20px;
     }
 
-    /* 2. 카드 높이 100% 강제 */
+    /* 카드 공통 설정 */
     .card {
         height: 100% !important;
         display: flex;
@@ -27,12 +25,55 @@
         margin-bottom: 0 !important;
     }
 
-    /* 3. 카드 내부 스크롤 활성화 */
+    /* 카드 내부 스크롤 */
     .card-body {
         flex-grow: 1;
         overflow-y: auto;
         padding: 20px;
     }
+    
+    /* --------------------------------------------------- */
+    /* ✅ [핵심] 달력 & 툴팁 스타일 (my_attendance와 통일) */
+    /* --------------------------------------------------- */
+    .calendar-table {
+        width: 100%; border-collapse: collapse; text-align: center; table-layout: fixed; height: auto; 
+    }
+    
+    .calendar-table th { 
+        padding: 5px 0; color: #999; font-weight: normal; font-size: 0.8em; height: 38px;
+    }
+    
+    .calendar-table td { 
+        padding: 2px 0; position: relative; cursor: default; vertical-align: middle; height: 43px;
+    }
+    
+    /* 날짜 숫자 원형 스타일 */
+    .day-number {
+        display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; border-radius: 50%; font-size: 1em;
+    }
+    
+    /* 상태별 배경색 */
+    .status-normal .day-number { background-color: #e8f5e9; color: #2ecc71; font-weight: bold; }
+    .status-late .day-number { background-color: #fff3e0; color: #e67e22; font-weight: bold; }
+    .status-absent .day-number { background-color: #ffebee; color: #e74c3c; font-weight: bold; }
+    .status-leave .day-number { background-color: #e3f2fd; color: #3498db; font-weight: bold; }
+
+    /* 툴팁 스타일 */
+    .calendar-tooltip {
+        visibility: hidden; opacity: 0;
+        width: 130px; background-color: rgba(0,0,0,0.85); color: #fff; text-align: center;
+        border-radius: 6px; padding: 6px;
+        position: absolute; z-index: 100;
+        bottom: 100%; left: 50%; transform: translateX(-50%);
+        transition: opacity 0.1s; pointer-events: none;
+        font-size: 0.8em; line-height: 1.3; margin-bottom: 5px;
+    }
+    .calendar-tooltip::after {
+        content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+        border-width: 5px; border-style: solid; border-color: rgba(0,0,0,0.85) transparent transparent transparent;
+    }
+    td:hover .calendar-tooltip { visibility: visible; opacity: 1; }
 </style>
 {% endblock %}
 
@@ -46,7 +87,15 @@
         <span style="font-size: 1.1em; color: #555;">
             복무 통계 요약
         </span>
-        <a href="{{ url_for('attendance_employee') }}" class="sub-action-btn header-btn" style="margin-left: auto;">🔙 직원 목록</a>
+        {% if source == 'realtime' %}
+            <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn" style="margin-left: auto;">
+                🔙 실시간 현황
+            </a>
+        {% else %}
+            <a href="{{ url_for('attendance_employee') }}" class="sub-action-btn header-btn" style="margin-left: auto;">
+                🔙 직원 목록
+            </a>
+        {% endif %}
     </div>
     
     <div class="card-body">
@@ -130,10 +179,51 @@
     </div>
     
     <div class="card-body" style="padding: 10px; display: flex; align-items: center; justify-content: center;">
-        <div id="attendance-calendar" style="width: 100%;">
-            {{ calendar_html | safe }} 
-        </div>
+        
+        <table class="calendar-table">
+            <thead>
+                <tr>
+                    <th style="color: #e74c3c;">일</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th style="color: #3498db;">토</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in month_calendar %}
+                <tr>
+                    {% for day in week %}
+                        {% if day != 0 %}
+                            {% set info = daily_attendance.get(day) %}
+                            <td class="{{ info.css_class if info else '' }}">
+                                
+                                <span class="day-number">{{ day }}</span>
+                                
+                                {% if info %}
+                                <div class="calendar-tooltip">
+                                    <strong>{{ info.status }}</strong><br>
+                                    {{ info.clock_in or '-' }} ~ {{ info.clock_out or '-' }}
+                                </div>
+                                {% endif %}
+                            </td>
+                        {% else %}
+                            <td></td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
     </div>
 </div>
+
+<script>
+    function changeMonth(year, month) {
+        if (month < 1) { year -= 1; month = 12; }
+        if (month > 12) { year += 1; month = 1; }
+        const url = new URL(window.location.href);
+        url.searchParams.set('year', year);
+        url.searchParams.set('month', month);
+        window.location.href = url.toString();
+    }
+</script>
 
 {% endblock %}

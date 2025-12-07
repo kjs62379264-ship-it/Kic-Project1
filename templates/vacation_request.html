@@ -56,7 +56,7 @@
         <form id="request-form" method="POST" action="{{ url_for('vacation_request') }}">
             <input type="hidden" id="form_type" name="form_type" value="vacation">
             
-            <div style="display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 20px; margin-bottom: 2px; flex-wrap: wrap;">
                 <div class="form-group" style="flex-grow: 1;">
                     <label>성명:</label> <span style="font-weight: bold;">{{ g.user['name'] }}</span>
                 </div>

@@ -4,7 +4,7 @@
 
 {% block custom_styles %}
 <style>
-    /* 1. 메인 레이아웃: 화면 꽉 채우기 */
+    /* 1. 화면 꽉 채우기 레이아웃 */
     .content-grid {
         height: 100%;
         overflow: hidden; 
@@ -13,130 +13,168 @@
         flex-direction: column;
     }
 
-    /* 2. 직원 명부 카드: 남은 공간 모두 차지 */
-    .employee-list-container {
+    /* 2. 통합 카드 (전체 화면을 하나의 카드로 사용) */
+    .main-card {
         flex-grow: 1;
         display: flex;
         flex-direction: column;
-        overflow: hidden; 
+        overflow: hidden;
         margin-bottom: 0 !important;
-    }
-    
-    /* 카드 내부 본문: 평소에는 스크롤 가능 */
-    .employee-list-container .card-body {
-        flex-grow: 1;
-        padding: 0 20px 10px 20px;
-        overflow-y: auto; 
-    }
-
-    /* 3. 모달 스타일 (화면 정중앙) */
-    .modal {
-        display: none; 
-        position: fixed; 
-        z-index: 9999; /* 최상위 */
-        left: 0;
-        top: 0;
-        width: 100%; 
-        height: 100%; 
-        background-color: rgba(0,0,0,0.5); /* 반투명 배경 */
-        
-        /* 정중앙 정렬 */
-        align-items: center;
-        justify-content: center;
-    }
-
-    .modal-content {
         background-color: #fff;
         border-radius: 8px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        width: 90%;
-        max-width: 800px;
-        max-height: 85vh;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-        padding: 0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
-    
-    .modal-header {
-        padding: 20px;
+
+    /* 3. 통합 헤더 영역 (제목 + 검색창 포함) */
+    .unified-header {
+        flex: 0 0 auto; /* 높이 자동 */
         border-bottom: 1px solid #eee;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        background-color: #fff;
+        padding: 20px 20px 15px 20px; 
     }
-    .modal-header h3 { margin: 0; font-size: 1.2em; }
 
-    .modal-body {
-        padding: 20px;
-        overflow-y: auto; /* 모달 내부는 스크롤 가능 */
+    /* 4. 테이블 영역 (남은 공간 꽉 채움) */
+    .card-body {
+        flex-grow: 1;
+        overflow-y: auto; /* 여기서 스크롤 */
+        padding: 0 20px 20px 20px;
+    }
+
+    /* 테이블 스타일 */
+    .employee-table {
+        width: 100%;
+        border-collapse: separate; 
+        border-spacing: 0;
+        margin-top: 0;
+    }
+
+    /* 헤더 고정 */
+    .employee-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f9f9f9;
+        z-index: 10;
+        padding: 12px 10px;
+        border-bottom: 1px solid #ddd;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
     
-    .loader {
-        border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%;
-        width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 50px auto;
+    .employee-table td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        height: 41px;
+        vertical-align: middle;
+        background-color: #fff;
     }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-    /* 🔥 [핵심 해결책] 모달이 열렸을 때(.modal-open), 뒤쪽 목록의 스크롤을 강제로 없앰 */
-    body.modal-open .employee-list-container .card-body {
-        overflow-y: hidden !important;
+    /* 검색 필터 및 버튼 스타일 */
+    .search-control { height: 36px; padding: 0 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.95em; }
+    .search-btn { height: 36px; line-height: 34px; padding: 0 15px; border-radius: 4px; cursor: pointer; border: none; font-weight: bold; color: white; font-size: 0.95em; }
+    .btn-main { background-color: #3498db; }
+    .btn-sub { background-color: #7f8c8d; }
+    .btn-print { background-color: #2ecc71; }
+    
+    .search-label { font-weight: bold; margin-right: 5px; color: #555; }
+
+    /* 상단 컨트롤 박스 (검색 조건 감싸는 회색 박스) */
+    .control-box {
+        margin-top: 15px;
+        background-color: #f8f9fa; /* 연한 회색 배경 */
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #eee;
     }
+
+    /* 모달 스타일 */
+    .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+    .modal-content { background-color: #fff; border-radius: 8px; width: 90%; max-width: 800px; max-height: 85vh; display: flex; flex-direction: column; padding: 0; position: relative; }
+    .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { margin: 0; font-size: 1.2em; }
+    .modal-body { padding: 20px; overflow-y: auto; }
+    .loader { border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 50px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    body.modal-open .card-body { overflow-y: hidden !important; }
 </style>
 {% endblock %}
 
 {% block page_content %}
 
-<div class="card employee-list-container">
-    <div class="card-header employee-list-header">
-        <div>직원 명부 (총 {{ employee_count }}명)</div>
-        <div class="header-actions">
-            {% if g.user.role == 'admin' %}
-            <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="sub-action-btn header-btn">🖨️ 명부 인쇄</a>
-            <a href="{{ url_for('add_employee') }}" class="main-action-btn header-btn">➕ 신규 직원 등록</a>
-            {% endif %}
+<div class="main-card">
+    
+    <div class="unified-header">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 1.2em; font-weight: bold; color: #2c3e50;">직원 명부 (총 {{ employee_count }}명)</div>
+            
+            <div class="header-actions" style="display: flex; gap: 5px;">
+                {% if g.user.role == 'admin' %}
+                <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="search-btn btn-print" style="text-decoration: none; display: inline-flex; align-items: center;">🖨️ 명부 인쇄</a>
+                <a href="{{ url_for('add_employee') }}" class="search-btn btn-main" style="text-decoration: none; display: inline-flex; align-items: center;">➕ 신규 직원 등록</a>
+                {% endif %}
+            </div>
         </div>
-    </div>
 
-    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
-        <form method="GET" action="{{ url_for('hr_management') }}">
-            <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
-                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center; flex-grow: 1;">
-                    <span>사번: <input type="text" name="id" placeholder="사번" style="width: 100px;" value="{{ request.args.get('id', '') }}"></span>
-                    <span>이름: <input type="text" name="name" placeholder="이름" style="width: 100px;" value="{{ request.args.get('name', '') }}"></span>
-                    <span>부서: 
-                        <select name="department">
-                            <option value="" {% if request.args.get('department', '') == '' %}selected{% endif %}>-- 전체 --</option>
+        <div class="control-box">
+            <form method="GET" action="{{ url_for('hr_management') }}">
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                    
+                    <div style="display: flex; align-items: center;">
+                        <span class="search-label">사번:</span>
+                        <input type="text" name="id" class="search-control" placeholder="사번" style="width: 100px;" value="{{ request.args.get('id', '') }}">
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <span class="search-label">이름:</span>
+                        <input type="text" name="name" class="search-control" placeholder="이름" style="width: 100px;" value="{{ request.args.get('name', '') }}">
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <span class="search-label">부서:</span>
+                        <select name="department" class="search-control">
+                            <option value="">-- 전체 --</option>
                             {% for dept in departments %}
-                            <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>{{ dept['name'] }}</option>
+                                <option value="{{ dept['name'] if dept['name'] is defined else dept }}" 
+                                        {% if request.args.get('department') == (dept['name'] if dept['name'] is defined else dept) %}selected{% endif %}>
+                                    {{ dept['name'] if dept['name'] is defined else dept }}
+                                </option>
                             {% endfor %}
                         </select>
-                    </span>
-                    <span>직급: 
-                        <select name="position">
-                            <option value="" {% if request.args.get('position', '') == '' %}selected{% endif %}>-- 전체 --</option>
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <span class="search-label">직급:</span>
+                        <select name="position" class="search-control">
+                            <option value="">-- 전체 --</option>
                             {% for pos in positions %}
-                            <option value="{{ pos['name'] }}" {% if request.args.get('position') == pos['name'] %}selected{% endif %}>{{ pos['name'] }}</option>
+                                <option value="{{ pos['name'] if pos['name'] is defined else pos }}" 
+                                        {% if request.args.get('position') == (pos['name'] if pos['name'] is defined else pos) %}selected{% endif %}>
+                                    {{ pos['name'] if pos['name'] is defined else pos }}
+                                </option>
                             {% endfor %}
                         </select>
-                    </span>
-                    <span>상태: 
-                        <select name="status">
+                    </div>
+
+                    <div style="display: flex; align-items: center;">
+                        <span class="search-label">상태:</span>
+                        <select name="status" class="search-control">
                             <option value="재직" {% if request.args.get('status', '재직') == '재직' %}selected{% endif %}>재직</option>
                             <option value="퇴사" {% if request.args.get('status') == '퇴사' %}selected{% endif %}>퇴사</option>
                             <option value="전체" {% if request.args.get('status') == '전체' %}selected{% endif %}>전체</option>
                         </select>
-                    </span>
+                    </div>
+                    
+                    <div style="margin-left: auto; display: flex; gap: 10px;">
+                        <button type="submit" class="search-btn btn-main">검색</button>
+                        <a href="{{ url_for('hr_management') }}" class="search-btn btn-sub" style="text-decoration: none; display: inline-flex; align-items: center;">초기화</a>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 10px; margin-left: auto;">
-                    <button type="submit" class="sub-action-btn header-btn">검색</button>
-                    <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn" style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
-                </div>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
     
     <div class="card-body">
+        
         <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
 
         <table class="employee-table" style="margin-top: 0;">
@@ -146,17 +184,27 @@
                 </tr>
             </thead>
             <tbody>
-            {% for employee in employees %}
-            <tr class="{{ 'resigned' if employee['status'] == '퇴사' else '' }}">
-                <td>{{ employee['id'] }}</td>
-                <td><a href="#" onclick="openEmployeeModal('{{ employee.id }}'); return false;" style="color: inherit; text-decoration: none; font-weight: bold;">{{ employee['name'] }}</a></td>
-                <td>{{ employee['department'] }}</td>
-                <td>{{ employee['position'] }}</td>
-                <td><button class="detail-btn" onclick="openEmployeeModal('{{ employee.id }}')">조회</button></td> 
-            </tr>
-            {% else %}
-            <tr><td colspan="5" style="text-align: center; padding: 50px;">등록된 직원이 없습니다.</td></tr>
-            {% endfor %}
+                {% for employee in employees %}
+                <tr class="{{ 'resigned' if employee['status'] == '퇴사' else '' }}">
+                    <td>{{ employee['id'] }}</td>
+                    <td>
+                        <a href="#" onclick="openEmployeeModal('{{ employee.id }}'); return false;" style="color: inherit; text-decoration: none; font-weight: bold;">
+                            {{ employee['name'] }}
+                        </a>
+                    </td>
+                    <td>{{ employee['department'] }}</td>
+                    <td>{{ employee['position'] }}</td>
+                    <td>
+                        <button class="detail-btn" onclick="openEmployeeModal('{{ employee.id }}')">조회</button>
+                    </td> 
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 50px; color: #7f8c8d;">등록된 직원이 없습니다.</td>
+                </tr>
+                {% endfor %}
+
+               
             </tbody>
         </table>
     </div>
@@ -180,17 +228,10 @@
     const modalLoader = document.getElementById('modalLoader');
 
     function openEmployeeModal(employeeId) {
-        empModal.style.display = "flex"; // 중앙 정렬
-        
-        // ✅ [핵심] body에 'modal-open' 클래스를 붙임 -> CSS에서 목록 스크롤을 숨김
+        empModal.style.display = "flex";
         document.body.classList.add('modal-open');
-
         modalContent.innerHTML = ""; 
-        if(modalLoader) {
-             modalContent.appendChild(modalLoader); 
-             modalLoader.style.display = "block";
-        }
-
+        if(modalLoader) { modalContent.appendChild(modalLoader); modalLoader.style.display = "block"; }
         fetch(`/hr/employee/modal/${employeeId}`)
             .then(response => response.text())
             .then(html => {
@@ -199,32 +240,22 @@
                 const scripts = modalContent.getElementsByTagName("script");
                 for (let i = 0; i < scripts.length; i++) eval(scripts[i].innerText);
             })
-            .catch(error => {
-                modalContent.innerHTML = "<p style='text-align:center; padding:20px; color:red;'>오류 발생</p>";
-            });
+            .catch(error => { modalContent.innerHTML = "<p style='text-align:center; padding:20px; color:red;'>오류 발생</p>"; });
     }
 
     function closeEmployeeModal() {
         empModal.style.display = "none";
-        // ✅ [핵심] 클래스 제거 -> 목록 스크롤 다시 생김
         document.body.classList.remove('modal-open');
     }
 
-    window.onclick = function(event) {
-        if (event.target == empModal) closeEmployeeModal();
-    }
-    // ✅ [신규 추가] 페이지 로드 시 URL 파라미터를 확인하여 모달 자동 열기
+    window.onclick = function(event) { if (event.target == empModal) closeEmployeeModal(); }
+    
     document.addEventListener('DOMContentLoaded', function() {
         const urlParams = new URLSearchParams(window.location.search);
         const openModalId = urlParams.get('open_modal');
-        
         if (openModalId) {
-            // 해당 직원 ID로 모달 열기 함수 실행
             openEmployeeModal(openModalId);
-            
-            // (선택 사항) URL에서 파라미터 제거 (새로고침 시 계속 뜨는 것 방지)
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, newUrl);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
     });
 </script>

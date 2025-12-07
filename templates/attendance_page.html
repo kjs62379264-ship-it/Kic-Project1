@@ -1,46 +1,139 @@
 {% extends "base.html" %}
 
-{% block title %}근태 관리 시스템{% endblock %}
-{% block body_class %}attendance-page-3-grid{% endblock %} 
+{% block title %}실시간 근태 현황{% endblock %}
+{% block page_body_class %}attendance-page{% endblock %}
+
+{% block custom_styles %}
+<style>
+    /* 1. 화면 꽉 채우기 (상하 1:1 분할) */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr; /* 2열 */
+        grid-template-rows: 1.15fr 0.85fr;    /* ✅ 2행 (1:1 비율 고정) */
+        gap: 20px;
+    }
+
+    /* 카드 공통 설정 */
+    .card {
+        height: 100% !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+    }
+
+    /* 카드 내부 스크롤 */
+    .card-body {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 0 20px 10px 20px; /* 상단 패딩 0 (가림막 때문) */
+    }
+    
+    /* 하단 요약 카드 전용 스타일 */
+    .summary-card-body {
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* ✅ [디자인] 검색 필터 크기 확대 */
+    .search-control {
+        height: 36px;          
+        padding: 0 10px;
+        font-size: 0.95em;     
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        outline: none;
+    }
+    .search-control:focus { border-color: #3498db; }
+
+    /* 검색 버튼 스타일 */
+    .search-btn {
+        height: 36px;
+        line-height: 34px;    
+        padding: 0 20px;
+        font-size: 0.95em;
+    }
+    .search-label { font-weight: bold; margin-right: 5px; color: #555; }
+
+    /* 테이블 행 높이 고정 (촘촘하게) */
+    .employee-table td, .employee-table th {
+        height: 42px;
+        padding: 5px 10px;
+    }
+
+    /* 모달 스타일 (수정용) */
+    .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+    .modal-content { background-color: #fff; border-radius: 8px; width: 90%; max-width: 400px; display: flex; flex-direction: column; padding: 0; }
+    .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h3 { margin: 0; font-size: 1.2em; }
+    .modal-body { padding: 20px; }
+</style>
+{% endblock %}
 
 {% block page_content %}
 
-<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1 / 2; max-height: 700px;"> 
-    <div class="card-header employee-list-header">
+<div class="card attendance-box-top" style="grid-column: 1 / 3; grid-row: 1 / 2;"> 
+    <div class="card-header employee-list-header" style="display: flex; justify-content: space-between; align-items: center;">
         <div>근무 리스트 ({{ employees | length }}명)</div>
-        <div class="header-actions">
-            <input type="date" value="{{ request.args.get('date', '') }}" style="padding: 5px; border-radius: 5px; border: 1px solid #ccc;">
-            <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn">⟳ 오늘</a>
+        
+        <div class="header-actions" style="display: flex; align-items: center; gap: 10px;">
+            <form method="GET" action="{{ url_for('attendance') }}" style="display: flex; align-items: center; gap: 5px; margin: 0;">
+                 <input type="date" name="date" value="{{ request.args.get('date', '') }}" 
+                        style="padding: 5px; border-radius: 5px; border: 1px solid #ccc; height: 36px; box-sizing: border-box;">
+                 <button type="submit" class="sub-action-btn search-btn">조회</button>
+            </form>
+            <a href="{{ url_for('attendance') }}" class="sub-action-btn search-btn" 
+               style="text-decoration: none; display: inline-block; text-align: center;">
+               ⟳ 오늘
+            </a>
         </div>
     </div>
     
     <div style="padding: 15px; border-bottom: 1px solid #e0e0e0;">
         <form method="GET" action="{{ url_for('attendance') }}">
+            <input type="hidden" name="date" value="{{ request.args.get('date', '') }}">
+            
             <div class="search-filters" style="display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
                 
-                <span>사번: <input type="text" name="id" placeholder="사번으로 검색" style="width: 120px;" value="{{ request.args.get('id', '') }}"></span>
-                <span>이름: <input type="text" name="name" placeholder="이름으로 검색" style="width: 120px;" value="{{ request.args.get('name', '') }}"></span>
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">사번:</span>
+                    <input type="text" name="id" class="search-control" placeholder="사번" style="width: 100px;" value="{{ request.args.get('id', '') }}">
+                </div>
 
-                <span>부서: 
-                    <select name="department">
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">이름:</span>
+                    <input type="text" name="name" class="search-control" placeholder="이름" style="width: 100px;" value="{{ request.args.get('name', '') }}">
+                </div>
+
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">부서:</span>
+                    <select name="department" class="search-control">
                         <option value="" {% if request.args.get('department', '') == '' %}selected{% endif %}>-- 전체 --</option>
-                        {% for dept in departments %}
-                        <option value="{{ dept['name'] }}" {% if request.args.get('department') == dept['name'] %}selected{% endif %}>{{ dept['name'] }}</option>
+                        {% for dept_name in departments %}
+                        <option value="{{ dept_name }}" {% if request.args.get('department') == dept_name %}selected{% endif %}>{{ dept_name }}</option>
                         {% endfor %}
                     </select>
-                </span>
+                </div>
 
-                <span>직급: 
-                    <select name="position">
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">직급:</span>
+                    <select name="position" class="search-control">
                         <option value="" {% if request.args.get('position', '') == '' %}selected{% endif %}>-- 전체 --</option>
-                        {% for pos in positions %}
-                        <option value="{{ pos['name'] }}" {% if request.args.get('position') == pos['name'] %}selected{% endif %}>{{ pos['name'] }}</option>
+                        {% for pos_name in positions %}
+                        <option value="{{ pos_name }}" {% if request.args.get('position') == pos_name %}selected{% endif %}>{{ pos_name }}</option>
                         {% endfor %}
                     </select>
-                </span>
+                </div>
                 
-                <span>상태: 
-                    <select name="status">
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">상태:</span>
+                    <select name="status" class="search-control">
                         <option value="" {% if request.args.get('status', '') == '' %}selected{% endif %}>-- 전체 --</option>
                         <option value="재실" {% if request.args.get('status') == '재실' %}selected{% endif %}>재실</option>
                         <option value="휴가" {% if request.args.get('status') == '휴가' %}selected{% endif %}>휴가</option>
@@ -48,19 +141,21 @@
                         <option value="외근" {% if request.args.get('status') == '외근' %}selected{% endif %}>외근</option>
                         <option value="출장" {% if request.args.get('status') == '출장' %}selected{% endif %}>출장</option>
                     </select>
-                </span>
+                </div>
 
                 <div style="margin-left: auto; display: flex; gap: 10px;">
-                    <button type="submit" class="sub-action-btn header-btn">검색</button>
-                    <a href="{{ url_for('attendance') }}" class="sub-action-btn header-btn" style="background-color: #7f8c8d; text-decoration: none;">초기화</a>
+                    <button type="submit" class="sub-action-btn search-btn" style="background-color: #3498db;">검색</button>
+                    <a href="{{ url_for('attendance') }}" class="sub-action-btn search-btn" style="background-color: #7f8c8d; text-decoration: none; text-align: center;">초기화</a>
                 </div>
             </div>
         </form>
     </div>
     
-    <div class="card-body" style="padding-top: 10px; overflow-y: auto;">
-        <table class="employee-table">
-            <thead>
+    <div class="card-body">
+        <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
+
+        <table class="employee-table" style="margin-top: 0;">
+            <thead style="position: sticky; top: 15px; background-color: #f9f9f9; z-index: 5; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
                 <tr>
                     <th style="width: 80px;">상태</th>
                     <th>사번</th> 
@@ -74,97 +169,91 @@
             </thead>
             <tbody>
             {% for emp in employees %}
-            <tr style="{% if emp['status'] == '휴가' %}background-color: #f7f7f7; color: #999;{% elif emp['status'] == '부재' %}background-color: #ffebee;{% elif emp['status'] in ['외근', '출장'] %}background-color: #ecf0f1;{% endif %}">
+            <tr style="{% if emp['status'] == '퇴근' %}background-color: #f9f9f9; color: #aaa;{% elif emp['status'] == '휴가' %}background-color: #f7f7f7; color: #999;{% elif emp['status'] == '부재' %}background-color: #ffebee;{% elif emp['status'] in ['외근', '출장'] %}background-color: #ecf0f1;{% endif %}">
                 <td style="font-weight: bold; text-align: center;">
-                    {% if emp['status'] == '재실' %}
-                        <span style="color: #2ecc71;">● 재실</span>
-                    {% elif emp['status'] == '휴가' %}
-                        <span style="color: #3498db;">✈️ 휴가</span>
-                    {% elif emp['status'] == '부재' %}
-                        <span style="color: #e74c3c;">⚠️ 부재</span>
-                    {% elif emp['status'] == '외근' %}
-                        <span style="color: #f39c12;">🚗 외근</span>
-                    {% elif emp['status'] == '출장' %}
-                        <span style="color: #1abc9c;">💼 출장</span>
-                    {% else %}
-                        {{ emp['status'] }}
-                    {% endif %}
+                    {% if emp['status'] == '재실' %} <span style="color: #2ecc71;">● 재실</span>
+                    {% elif emp['status'] == '퇴근' %} <span style="color: #7f8c8d; border: 1px solid #ccc; padding: 2px 6px; border-radius: 4px; font-size: 0.9em;">👋 퇴근</span>
+                    {% elif emp['status'] == '휴가' %} <span style="color: #3498db;">✈️ 휴가</span>
+                    {% elif emp['status'] == '부재' %} <span style="color: #e74c3c;">⚠️ 부재</span>
+                    {% elif emp['status'] == '외근' %} <span style="color: #f39c12;">🚗 외근</span>
+                    {% elif emp['status'] == '출장' %} <span style="color: #1abc9c;">💼 출장</span>
+                    {% else %} {{ emp['status'] }} {% endif %}
                 </td>
-                
                 <td>{{ emp['id'] }}</td> 
-                
                 <td>{{ emp['name'] }}</td>
                 <td>{{ emp['department'] }}</td>
                 <td>{{ emp['position'] }}</td>
                 <td>{{ emp['check_in'] if emp['check_in'] else '-' }}</td>
                 <td>{{ emp['check_out'] if emp['check_out'] else '-' }}</td>
-                
                 <td>
                     <div style="display: flex; gap: 5px;">
-                        <a href="{{ url_for('attendance_detail', employee_id=emp['id']) }}" class="detail-btn">조회</a>
+                        <a href="{{ url_for('attendance_employee_detail', employee_id=emp['id'], source='realtime') }}" class="detail-btn">조회</a>
                         
                         <button type="button" class="sub-action-btn" style="padding: 5px 10px; font-size: 0.8em;"
-                                onclick="openEditAttendanceModal('{{ emp.id }}', '{{ emp.name }}', '{{ emp.check_in }}', '{{ emp.check_out }}', '')">
-                            수정
-                        </button>
+        onclick="openEditAttendanceModal('{{ emp.id }}', '{{ emp.name }}', '{{ emp.check_in }}', '{{ emp.check_out }}', '{{ request.args.get('date', '') }}', '{{ emp.status }}')">
+    수정
+</button>
                     </div>
                 </td> 
             </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 50px; color: #7f8c8d;">근무 기록이 없습니다.</td>
+            </tr>
             {% endfor %}
+
+            {% if employees|length < 12 %}
+                {% for i in range(12 - employees|length) %}
+                <tr style="height: 42px;"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+                {% endfor %}
+            {% endif %}
             </tbody>
         </table>
     </div>
 </div>
 
-<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3; height: 380px;">
+<div class="card attendance-box-bottom-left" style="grid-row: 2 / 3;">
     <div class="card-header">근무 현황 (총 {{ total_employees_count }}명)</div>
-    <div class="card-body attendance-summary-circles">
+    <div class="card-body summary-card-body attendance-summary-circles" style="justify-content: space-around;">
         <div class="status-circle-item">
-            <div class="circle green-bg">
-                <span class="count">{{ status_counts['재실'] }}</span>명
+            <div class="circle green-bg custom-tooltip" title="🏢 근무중: {{ status_counts['재실_상세'] }}명&#10;🏠 퇴근: {{ status_counts['퇴근_상세'] }}명">
+                <span class="count">{{ status_counts['출근'] }}</span>명
             </div>
-            <div class="label">재실</div>
+            <div class="label">출근</div>
         </div>
         <div class="status-circle-item">
-            <div class="circle blue-bg">
-                <span class="count">{{ status_counts['휴가'] }}</span>명
-            </div>
+            <div class="circle blue-bg"><span class="count">{{ status_counts['휴가'] }}</span>명</div>
             <div class="label">휴가</div>
         </div>
         <div class="status-circle-item">
-            <div class="circle orange-bg">
-                <span class="count">{{ status_counts['외근/출장'] }}</span>명
-            </div>
+            <div class="circle orange-bg"><span class="count">{{ status_counts['외근/출장'] }}</span>명</div>
             <div class="label">외근/출장</div>
         </div>
         <div class="status-circle-item">
-            <div class="circle red-bg">
-                <span class="count">{{ status_counts['부재'] }}</span>명
-            </div>
+            <div class="circle red-bg"><span class="count">{{ status_counts['부재'] }}</span>명</div>
             <div class="label">부재</div>
         </div>
     </div>
 </div>
 
-<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3; height: 380px;">
+<div class="card attendance-box-bottom-right" style="grid-row: 2 / 3;">
     <div class="card-header">근태 요청 현황</div>
-    <div class="card-body" style="padding-bottom: 5px; 
-                                    display: flex; 
-                                    flex-direction: column;">
+    <div class="card-body" style="padding: 5px 20px 10px 20px; display: flex; flex-direction: column;">
         
-        <div style="overflow-y: auto;">
-            <table class="employee-table" style="font-size: 0.9em; width: 100%;">
-                <thead>
-                <tr>
-                    <th style="width: 20%;">이름(부서)</th> 
-                    <th style="width: 15%;">요청 유형</th> 
-                    <th style="width: 25%;">기간</th> 
-                    <th style="width: 15%;">요청일</th>
-                    <th style="width: 25%; text-align: center;">처리 현황</th>
-                </tr>
+        <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
+
+        <div style="flex-grow: 1; overflow-y: auto;">
+            <table class="employee-table" style="font-size: 0.9em; width: 100%; margin-top: 0;">
+                <thead style="position: sticky; top: 0; background: #f9f9f9; z-index: 5; box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);">
+                    <tr>
+                        <th style="width: 20%;">이름(부서)</th> 
+                        <th style="width: 15%;">요청 유형</th> 
+                        <th style="width: 30%;">기간</th> 
+                        <th style="width: 15%;">요청일</th>
+                        <th style="width: 20%; text-align: center;">처리 현황</th>
+                    </tr>
                 </thead>
                 <tbody>
-                
                 {% for req in vacation_requests %}
                     <tr>
                         <td>{{ req['name'] }} ({{ req['department'] | default('-') }})</td> 
@@ -172,84 +261,102 @@
                         <td>{{ req['start_date'] }} ~ {{ req['end_date'] }}</td>
                         <td>{{ req['request_date'].split(' ')[0] }}</td>
                         <td style="text-align: center;">
-                            {% if req['status'] == '승인' %}
-                                <span class="status-indicator approved">승인됨</span>
-                            {% elif req['status'] == '반려' %}
-                                <span class="status-indicator rejected">반려됨</span>
-                            {% elif req['status'] == '대기' %}
-                                <span class="status-indicator pending">대기</span>
-                            {% else %}
-                                <span class="status-indicator">{{ req['status'] }}</span>
-                            {% endif %}
+                            <span class="status-indicator {{ 'approved' if req['status']=='승인' else 'rejected' if req['status']=='반려' else 'pending' }}">
+                                {{ req['status'] }}
+                            </span>
                         </td>
                     </tr>
-                
                 {% else %}
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: #7f8c8d; height: 105px;">현재 처리할 휴가 요청이 없습니다.</td>
-                    </tr>
+                    <tr><td colspan="5" style="text-align: center; padding: 30px;">요청 내역 없음</td></tr>
                 {% endfor %}
-                
                 </tbody>
             </table>
         </div>
+        
+        {% if total_pages > 1 %}
+        <div style="margin-top: auto; padding-top: 10px; display: flex; justify-content: center; gap: 5px;">
+            {% set args = request.args.copy() %}{% set _ = args.pop('page', None) %}
+            <a href="{{ url_for('attendance', page=current_page-1, **args) if current_page > 1 else '#' }}" 
+               class="pagination-link" style="padding: 5px 10px; border: 1px solid #ddd; {{ 'pointer-events: none; opacity: 0.5;' if current_page == 1 }}">&lt;</a>
+            {% for p in range(1, total_pages + 1) %}
+            <a href="{{ url_for('attendance', page=p, **args) }}" 
+               class="pagination-link" style="padding: 5px 10px; border: 1px solid #ddd; {{ 'background-color: #3498db; color: white;' if p == current_page else '' }}">{{ p }}</a>
+            {% endfor %}
+            <a href="{{ url_for('attendance', page=current_page+1, **args) if current_page < total_pages else '#' }}" 
+               class="pagination-link" style="padding: 5px 10px; border: 1px solid #ddd; {{ 'pointer-events: none; opacity: 0.5;' if current_page == total_pages }}">&gt;</a>
+        </div>
+        {% endif %}
+
     </div>
 </div> 
 
 <div id="editAttendanceModal" class="modal">
     <div class="modal-content" style="max-width: 400px;">
-        <span class="close" onclick="closeEditAttendanceModal()">&times;</span>
-        <h3>출퇴근 기록 수정</h3>
-        <p id="editModalEmployeeInfo" style="color: #555; margin-bottom: 15px;"></p>
-        
-        <form id="editAttendanceForm" method="POST" action="{{ url_for('update_attendance') }}">
-            <input type="hidden" name="employee_id" id="modal_employee_id">
-            <input type="hidden" name="record_date" id="modal_record_date">
+        <div class="modal-header">
+            <h3>출퇴근 기록 수정</h3>
+            <span class="close" onclick="closeEditAttendanceModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p id="editModalEmployeeInfo" style="color: #555; margin-bottom: 15px; text-align: center; font-weight: bold;"></p>
             
-            <div class="form-group">
-                <label for="modal_clock_in">출근 시간</label>
-                <input type="time" id="modal_clock_in" name="clock_in_time">
-            </div>
-            
-            <div class="form-group">
-                <label for="modal_clock_out">퇴근 시간</label>
-                <input type="time" id="modal_clock_out" name="clock_out_time">
-            </div>
-            
-            <div class="form-actions" style="margin-top: 20px;">
-                <button type="submit" class="btn main-action-btn" style="width: 100%;">수정 완료</button>
-            </div>
-        </form>
+            <form id="editAttendanceForm" method="POST" action="{{ url_for('update_attendance') }}">
+                <input type="hidden" name="employee_id" id="modal_employee_id">
+                <input type="hidden" name="record_date" id="modal_record_date">
+                
+                <div class="form-group">
+                    <label>근태 상태</label>
+                    <select name="attendance_status" id="modal_status" class="search-control" style="width: 100%;">
+                        <option value="정상">정상</option>
+                        <option value="지각">지각</option>
+                        <option value="조퇴">조퇴</option>
+                        <option value="결근">결근</option>
+                        <option value="휴가">휴가</option>
+                        <option value="외근">외근</option>
+                        <option value="출장">출장</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="modal_clock_in">출근 시간</label>
+                    <input type="time" id="modal_clock_in" name="clock_in_time" class="search-control" style="width: 100%;">
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal_clock_out">퇴근 시간</label>
+                    <input type="time" id="modal_clock_out" name="clock_out_time" class="search-control" style="width: 100%;">
+                </div>
+                
+                <button type="submit" class="btn main-action-btn" style="width: 100%; margin-top: 15px;">수정 완료</button>
+            </form>
+        </div>
     </div>
 </div>
 
 <script>
-    // 모달 열기 함수
-    function openEditAttendanceModal(id, name, clockIn, clockOut, date) {
+    // ✅ [수정] 인자에 'status' 추가
+    function openEditAttendanceModal(id, name, clockIn, clockOut, date, status) {
         document.getElementById('modal_employee_id').value = id;
-        // 날짜 정보가 없으면 오늘 날짜를 사용 (실제로는 리스트 루프에서 값을 넘겨줘야 함)
         document.getElementById('modal_record_date').value = date || new Date().toISOString().split('T')[0];
         document.getElementById('editModalEmployeeInfo').innerText = `직원: ${name} (${id})`;
         
-        // '-' 값이면 빈 값으로 설정
         document.getElementById('modal_clock_in').value = (clockIn === '-' || !clockIn) ? '' : clockIn;
         document.getElementById('modal_clock_out').value = (clockOut === '-' || !clockOut) ? '' : clockOut;
         
-        document.getElementById('editAttendanceModal').style.display = "block";
+        // ✅ [신규] 상태 값 설정 (select box)
+        const statusSelect = document.getElementById('modal_status');
+        // DB 상태값이 '재실', '퇴근' 등으로 변형되어 넘어오면 원래 상태(정상/지각 등)로 매핑해줘야 하지만,
+        // 여기서는 단순하게 값 매칭을 시도하고 없으면 기본값 유지
+        statusSelect.value = status; 
+        
+        const modal = document.getElementById('editAttendanceModal');
+        modal.style.display = "flex"; 
+        document.body.style.overflow = "hidden"; 
     }
-
-    // 모달 닫기 함수
     function closeEditAttendanceModal() {
         document.getElementById('editAttendanceModal').style.display = "none";
+        document.body.style.overflow = "";
     }
-
-    // 모달 바깥 클릭 시 닫기
-    window.onclick = function(event) {
-        const modal = document.getElementById('editAttendanceModal');
-        if (event.target == modal) {
-            closeEditAttendanceModal();
-        }
-    }
+    window.onclick = function(e) { if(e.target == document.getElementById('editAttendanceModal')) closeEditAttendanceModal(); }
 </script>
 
 {% endblock %}

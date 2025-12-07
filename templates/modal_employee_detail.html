@@ -1,127 +1,85 @@
-<div style="display: flex; gap: 20px;">
-    <div style="flex: 0 0 120px; text-align: center;">
+<div style="display: flex; gap: 25px; height: 100%;">
+    
+    <div style="flex: 0 0 140px; text-align: center; border-right: 1px solid #eee; padding-right: 20px; padding-top: 20px; display: flex; flex-direction: column; align-items: center;">
         <img src="{{ url_for('static', filename='profile_photos/' + (employee['profile_image'] or 'default.jpg')) }}" 
-             alt="프로필 사진" 
-             style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #eee;">
-        <h3 style="margin: 10px 0 5px 0; color: #2c3e50;">{{ employee['name'] }}</h3>
-        <span style="color: #7f8c8d;">{{ employee['position'] }}</span>
-        <div style="margin-top: 10px;">
-            <span class="status-badge status-{{ '재직' if employee['status'] == '재직' else '퇴사' }}">
-                {{ employee['status'] }}
-            </span>
-        </div>
+             alt="Profile Picture" 
+             style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 3px solid #f0f0f0; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        
+        <h3 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.3em;">{{ employee['name'] }}</h3>
+        <span style="color: #7f8c8d; font-size: 0.95em; display: block; margin-bottom: 15px;">{{ employee['position'] }}</span>
+        
+        <span class="status-badge" 
+              style="padding: 6px 15px; border-radius: 20px; font-size: 0.85em; font-weight: bold; 
+                     background-color: {{ '#e8f5e9' if employee['status'] == '재직' else '#ffebee' }}; 
+                     color: {{ '#2ecc71' if employee['status'] == '재직' else '#e74c3c' }};">
+            {{ employee['status'] }}
+        </span>
     </div>
 
-    <div style="flex-grow: 1;">
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 20px; padding-top: 10px;">
         
-        <div class="tab-header" style="margin-bottom: 15px; border-bottom: 2px solid #eee; display: flex; justify-content: space-between; align-items: center;">
-            
-            <div>
-                
+        <div>
+            <div style="border-bottom: 2px solid #3498db; padding-bottom: 8px; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: #3498db; font-size: 1.1em;">📋 기본 인적 사항</h4>
             </div>
 
-            <div style="display: flex; gap: 5px; margin-bottom: 5px;">
-                
-                {% if employee['status'] == '재직' %}
-                <a href="{{ url_for('print_certificate', employee_id=employee['id']) }}" target="_blank" class="btn sub-action-btn" style="padding: 5px 12px; font-size: 0.9em; text-decoration: none; background-color: #8e44ad;">
-                    📜 증명서
-                </a>
-                {% endif %}
-
-                {% if g.user.role == 'admin' %}
-                    <a href="{{ url_for('edit_employee', employee_id=employee['id']) }}" class="btn sub-action-btn" style="padding: 5px 12px; font-size: 0.9em; text-decoration: none;">
-                        ✏️ 수정
-                    </a>
-
-                    {% if employee['status'] == '재직' %}
-                    <form action="{{ url_for('process_departure', employee_id=employee['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('🚨 경고: 정말로 [{{ employee.name }}] 님을 퇴사 처리하시겠습니까?\n\n- 상태가 [퇴사]로 변경됩니다.\n- 로그인 권한이 [user]로 강등됩니다.');">
-                        <button type="submit" class="btn danger-action-btn" style="padding: 5px 12px; font-size: 0.9em;">
-                            👋 퇴사
-                        </button>
-                    </form>
-                    {% endif %}
-                    
-                    {% if employee['status'] == '퇴사' %}
-                    <form action="{{ url_for('process_rehire', employee_id=employee['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('정말로 [{{ employee.name }}] 님을 재입사(복직) 처리하시겠습니까?');">
-                        <button type="submit" class="btn main-action-btn" style="padding: 5px 12px; font-size: 0.9em;">
-                            ♻️ 재입사
-                        </button>
-                    </form>
-                    {% endif %}
-                {% endif %}
-            </div>
-        </div>
-
-        <div id="modal-info" class="tab-content-modal" style="display: block;">
-            <table class="employee-table" style="margin-top: 0;">
-                <tr><th>사번</th><td>{{ employee['id'] }}</td><th>부서</th><td>{{ employee['department'] }}</td></tr>
-                <tr><th>생년월일</th><td>{{ employee['birth_date'] }}</td><th>입사일</th><td>{{ employee['hire_date'] }}</td></tr>
-                <tr><th>연락처</th><td colspan="3">{{ employee['phone_number'] }}</td></tr>
-                <tr><th>이메일</th><td colspan="3">{{ employee['email'] }}</td></tr>
-                <tr><th>주소</th><td colspan="3">{{ employee['address'] }}</td></tr>
-            </table>
-            
-            <h5 style="margin: 15px 0 10px; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px;">급여 정보 요약</h5>
-             <table class="employee-table" style="margin-top: 0;">
+            <table class="employee-table" style="margin-top: 0; width: 100%; font-size: 0.95em;">
                 <tr>
-                    <th>계약 연봉</th>
-                    <td>{{ employee['annual_salary']|comma if employee['annual_salary'] else '-' }} 원</td>
-                    <th>월 기본급</th>
-                    <td>{{ employee['base_salary']|comma if employee['base_salary'] else '-' }} 원</td>
+                    <th style="width: 18%; background-color: #f9f9f9; padding: 8px;">사번</th>
+                    <td style="width: 32%; padding: 8px;">{{ employee['id'] }}</td>
+                    <th style="width: 18%; background-color: #f9f9f9; padding: 8px;">부서</th>
+                    <td style="width: 32%; padding: 8px;">{{ employee['department'] }}</td>
                 </tr>
                 <tr>
-                    <th>고정 수당</th>
-                    <td colspan="3">
-                        {% if allowances %}
-                            {% for all in allowances %}{{ all['allowance_name'] }}({{ all['amount']|comma }}){% if not loop.last %}, {% endif %}{% endfor %}
-                        {% else %}없음{% endif %}
-                    </td>
+                    <th style="background-color: #f9f9f9; padding: 8px;">입사일</th>
+                    <td style="padding: 8px;">{{ employee['hire_date'] }}</td>
+                    <th style="background-color: #f9f9f9; padding: 8px;">생년월일</th>
+                    <td style="padding: 8px;">{{ employee['birth_date'] }}</td>
+                </tr>
+                <tr>
+                    <th style="background-color: #f9f9f9; padding: 8px;">연락처</th>
+                    <td style="padding: 8px;">{{ employee['phone_number'] }}</td>
+                    <th style="background-color: #f9f9f9; padding: 8px;">이메일</th>
+                    <td style="padding: 8px;">{{ employee['email'] }}</td>
+                </tr>
+                <tr>
+                    <th style="background-color: #f9f9f9; padding: 8px;">주소</th>
+                    <td colspan="3" style="padding: 8px;">{{ employee['address'] }}</td>
                 </tr>
             </table>
         </div>
 
-        <div id="modal-attendance" class="tab-content-modal" style="display: none;">
-            <div style="margin-bottom: 10px; font-size: 0.9em; color: #555;">
-                <span style="margin-right: 10px;">이번 달 지각: <strong>{{ attendance_stats['late'] }}회</strong></span>
-                <span>결근: <strong>{{ attendance_stats['absent'] }}회</strong></span>
+<div>
+            <div style="border-bottom: 2px solid #95a5a6; padding-bottom: 8px; margin-bottom: 15px;">
+                <h4 style="margin: 0; color: #555; font-size: 1.1em;">💰 급여 정보 (세전 계약 기준)</h4>
             </div>
             
-            <div style="width: 100%;"> 
-                <table class="employee-table" style="margin-top: 0;">
-                    <thead>
-                        <tr><th>날짜</th><th>출근</th><th>퇴근</th><th>상태</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for record in attendance_records %}
-                        <tr>
-                            <td>{{ record['record_date'] }}</td>
-                            <td>{{ record['clock_in_time'].split(' ')[1][:5] if record['clock_in_time'] else '-' }}</td>
-                            <td>{{ record['clock_out_time'].split(' ')[1][:5] if record['clock_out_time'] else '-' }}</td>
-                            <td><span class="status-badge {{ 'status-정상' if record['attendance_status'] == '정상' else 'status-지각' }}">{{ record['attendance_status'] }}</span></td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4" style="text-align: center; color: #999;">최근 근태 기록이 없습니다.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <div style="display: flex; gap: 20px; background-color: #fff; padding: 5px;">
+                
+                <div style="flex: 1; border: 1px solid #eee; border-radius: 6px; padding: 15px; background-color: #fcfcfc;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #777; font-weight: bold;">계약 연봉</span>
+                        <span style="font-weight: bold; font-size: 1.2em; color: #2c3e50;">
+                            {{ employee['annual_salary']|comma if employee['annual_salary'] else '0' }} 원
+                        </span>
+                    </div>
+                </div>
+
+                <div style="flex: 1; border: 1px solid #eee; border-radius: 6px; padding: 15px; background-color: #fcfcfc;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #777; font-weight: bold;">월 기본급 (예상)</span>
+                        <span style="font-weight: bold; font-size: 1.2em; color: #2c3e50;">
+                            {% if employee['annual_salary'] %}
+                                {{ (employee['annual_salary'] / 12) | int | comma }} 원
+                            {% else %}
+                                0 원
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+
             </div>
         </div>
+
     </div>
 </div>
-
-<script>
-    // 모달 내부 탭 전환 스크립트
-    function openModalTab(evt, tabName) {
-        var i, tabcontent, tablinks;
-        tabcontent = document.getElementsByClassName("tab-content-modal");
-        for (i = 0; i < tabcontent.length; i++) {
-            tabcontent[i].style.display = "none";
-        }
-        tablinks = document.getElementsByClassName("tab-btn");
-        for (i = 0; i < tablinks.length; i++) {
-            tablinks[i].className = tablinks[i].className.replace(" active", "");
-        }
-        document.getElementById(tabName).style.display = "block";
-        evt.currentTarget.className += " active";
-    }
-</script>

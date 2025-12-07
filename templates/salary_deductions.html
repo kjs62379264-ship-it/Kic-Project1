@@ -2,19 +2,103 @@
 
 {% block title %}급여 수당/공제 관리{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* 1. 화면 꽉 채우기 레이아웃 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: flex; 
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    /* 2. 카드 공통 설정 */
+    .card {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+    }
+
+    /* 3. 상단 일괄 등록 카드 (높이 자동) */
+    .top-card {
+        flex: 0 0 auto; 
+    }
+
+    /* 4. 하단 리스트 카드 (남은 공간 꽉 채움) */
+    .bottom-card {
+        flex: 1; 
+        height: 100%; 
+    }
+
+    /* 5. 카드 바디 */
+    .card-body {
+        padding: 20px;
+        overflow: hidden; 
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* 리스트 카드 바디는 패딩 조정 */
+    .bottom-card .card-body {
+        padding: 0 20px 10px 20px;
+    }
+
+    /* 테이블 스크롤 컨테이너 */
+    .table-scroll-container {
+        flex-grow: 1;
+        overflow-y: auto;
+        position: relative;
+        border: 1px solid #eee;
+    }
+
+    /* 테이블 스타일 */
+    .employee-table {
+        width: 100%;
+        border-collapse: separate; 
+        border-spacing: 0;
+        margin-top: 0;
+    }
+
+    /* 헤더 고정 */
+    .employee-table thead th {
+        position: sticky;
+        top: 0;
+        background-color: #f9f9f9;
+        z-index: 10;
+        padding: 12px 10px;
+        border-bottom: 1px solid #ddd;
+        box-shadow: 0 2px 2px -1px rgba(0,0,0,0.1);
+    }
+
+    .employee-table td {
+        padding: 10px;
+        border-bottom: 1px solid #eee;
+        background-color: #fff;
+    }
+
+    /* 입력 폼 스타일 */
+    input[type="text"], select {
+        padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em;
+    }
+</style>
+{% endblock %}
+
 {% block page_content %}
 
-<div class="card" style="grid-column: 1 / -1; margin-bottom: 20px;">
+<div class="card top-card">
     <div class="card-header">
         <span>⚡ 그룹별 수당/공제 일괄 등록</span>
         <small style="color: #666; font-weight: normal; margin-left: 10px;">(목록에서 대상을 선택하여 일괄 적용합니다)</small>
     </div>
-    <div class="card-body" style="background-color: #f9fbfd;">
+    <div class="card-body" style="background-color: #f9fbfd; overflow: visible;">
         <form action="{{ url_for('add_group_item') }}" method="POST" style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
             
             <div style="display: flex; align-items: center; gap: 5px;">
                 <label style="font-weight: bold;">대상:</label>
-                <select name="target_type" id="target_type" onchange="toggleTargetInput()" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+                <select name="target_type" id="target_type" onchange="toggleTargetInput()" style="cursor: pointer;">
                     <option value="all">🏢 전 직원</option>
                     <option value="department">📂 부서별</option>
                     <option value="position">🎖️ 직급별</option>
@@ -23,42 +107,36 @@
             </div>
             
             <div id="div_dept" style="display: none;">
-                <select id="input_dept" name="target_value" disabled style="padding: 8px; min-width: 150px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+                <select id="input_dept" name="target_value" disabled style="min-width: 150px; cursor: pointer;">
                     <option value="">-- 부서 선택 --</option>
-                    {% for dept in departments %}
-                    <option value="{{ dept }}">{{ dept }}</option>
-                    {% endfor %}
+                    {% for dept in departments %}<option value="{{ dept }}">{{ dept }}</option>{% endfor %}
                 </select>
             </div>
 
             <div id="div_pos" style="display: none;">
-                <select id="input_pos" name="target_value" disabled style="padding: 8px; min-width: 150px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+                <select id="input_pos" name="target_value" disabled style="min-width: 150px; cursor: pointer;">
                     <option value="">-- 직급 선택 --</option>
-                    {% for pos in positions %}
-                    <option value="{{ pos }}">{{ pos }}</option>
-                    {% endfor %}
+                    {% for pos in positions %}<option value="{{ pos }}">{{ pos }}</option>{% endfor %}
                 </select>
             </div>
 
             <div id="div_indiv" style="display: none;">
-                <select id="input_indiv" name="target_value" disabled style="padding: 8px; min-width: 200px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+                <select id="input_indiv" name="target_value" disabled style="min-width: 200px; cursor: pointer;">
                     <option value="">-- 직원 선택 --</option>
-                    {% for emp in employees %}
-                    <option value="{{ emp.id }}">{{ emp.name }} ({{ emp.department }} {{ emp.position }})</option>
-                    {% endfor %}
+                    {% for emp in employees %}<option value="{{ emp.id }}">{{ emp.name }} ({{ emp.department }} {{ emp.position }})</option>{% endfor %}
                 </select>
             </div>
 
             <div style="display: flex; align-items: center; gap: 5px;">
                 <label style="font-weight: bold;">유형:</label>
-                <select name="item_type" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+                <select name="item_type" style="cursor: pointer;">
                     <option value="allowance">➕ 수당 (지급)</option>
                     <option value="deduction">➖ 공제 (차감)</option>
                 </select>
             </div>
 
-            <input type="text" name="item_name" placeholder="항목명 (예: 명절보너스)" required style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            <input type="text" name="amount" placeholder="금액 (원)" required style="padding: 8px; text-align: right; border: 1px solid #ccc; border-radius: 4px; width: 100px;">
+            <input type="text" name="item_name" placeholder="항목명 (예: 명절보너스)" required>
+            <input type="text" name="amount" placeholder="금액 (원)" required style="text-align: right; width: 100px;">
 
             <button type="submit" class="btn main-action-btn" style="padding: 8px 20px;">일괄 등록</button>
         </form>
@@ -68,92 +146,87 @@
 <script>
     function toggleTargetInput() {
         const type = document.getElementById('target_type').value;
-        
-        // 모든 입력 div 가져오기
         const divDept = document.getElementById('div_dept');
         const divPos = document.getElementById('div_pos');
         const divIndiv = document.getElementById('div_indiv');
-        
-        // 모든 실제 입력 요소 가져오기
         const inputDept = document.getElementById('input_dept');
         const inputPos = document.getElementById('input_pos');
         const inputIndiv = document.getElementById('input_indiv');
 
-        // 1. 일단 다 숨기고 비활성화 (전송 방지)
         divDept.style.display = 'none'; inputDept.disabled = true;
         divPos.style.display = 'none'; inputPos.disabled = true;
         divIndiv.style.display = 'none'; inputIndiv.disabled = true;
 
-        // 2. 선택된 유형에 따라 해당 리스트만 보여주고 활성화
-        if (type === 'department') {
-            divDept.style.display = 'block';
-            inputDept.disabled = false;
-        } else if (type === 'position') {
-            divPos.style.display = 'block';
-            inputPos.disabled = false;
-        } else if (type === 'individual') {
-            divIndiv.style.display = 'block';
-            inputIndiv.disabled = false;
-        }
-        // 'all'인 경우는 추가 선택창이 필요 없음
+        if (type === 'department') { divDept.style.display = 'block'; inputDept.disabled = false; } 
+        else if (type === 'position') { divPos.style.display = 'block'; inputPos.disabled = false; } 
+        else if (type === 'individual') { divIndiv.style.display = 'block'; inputIndiv.disabled = false; }
     }
-    
-    // 페이지 로드 시 초기 상태 설정
     document.addEventListener('DOMContentLoaded', toggleTargetInput);
 </script>
 
-<div class="card" style="grid-column: 1 / -1;">
+<div class="card bottom-card">
     <div class="card-header">
         <span>직원별 고정 공제 내역 (기존 데이터)</span>
     </div>
     <div class="card-body">
-        <table class="employee-table">
-            <thead>
+        
+        <div class="table-scroll-container">
+            <table class="employee-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">직원 정보</th>
+                        <th style="width: 55%;">현재 공제 항목 리스트</th>
+                        <th style="width: 30%;">개별 항목 추가 / 수정</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for emp in employees %}
                 <tr>
-                    <th style="width: 15%;">직원 정보</th>
-                    <th style="width: 50%;">현재 공제 항목 리스트</th>
-                    <th style="width: 35%;">개별 항목 추가</th>
+                    <td style="vertical-align: top;">
+                        <strong>{{ emp.name }}</strong><br>
+                        <span style="font-size: 0.9em; color: #555;">{{ emp.department }} {{ emp.position }}</span><br>
+                        <span style="font-size: 0.8em; color: #999;">({{ emp.id }})</span>
+                    </td>
+                    
+                    <td style="vertical-align: top;">
+                        {% set items = deduction_map[emp.id] %}
+                        {% if items %}
+                            <ul style="list-style: none; padding: 0; margin: 0;">
+                            {% for item in items %}
+                                <li style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 5px 0;">
+                                    <span>{{ item.deduction_name }} : <strong style="color: #e74c3c;">-{{ item.amount|comma }}원</strong></span>
+                                    <form action="{{ url_for('delete_deduction', deduction_id=item.id) }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="delete-notice-btn" onclick="return confirm('삭제하시겠습니까?');">X</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                            </ul>
+                        {% else %}
+                            <span style="color: #ccc;">등록된 추가 공제가 없습니다.</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td style="vertical-align: top; background-color: #fbfbfb;">
+                        <form action="{{ url_for('add_deduction') }}" method="POST" style="display: flex; gap: 5px; align-items: center;">
+                            <input type="hidden" name="employee_id" value="{{ emp.id }}">
+                            <input type="text" name="deduction_name" placeholder="항목명" required style="width: 100px;">
+                            <input type="text" name="amount" placeholder="금액" required style="width: 80px; text-align: right;">
+                            
+                            <button type="submit" class="btn sub-action-btn" style="padding: 6px 12px;">추가</button>
+                            
+                            <button type="button" class="btn sub-action-btn" 
+                                    style="padding: 6px 12px; background-color: #f39c12; color: white; border: none;"
+                                    onclick="alert('수정 기능은 준비 중입니다.')">
+                                수정
+                            </button>
+                        </form>
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-            {% for emp in employees %}
-            <tr>
-                <td style="vertical-align: top; padding-top: 15px;">
-                    <strong>{{ emp.name }}</strong><br>
-                    <span style="font-size: 0.9em; color: #555;">{{ emp.department }} {{ emp.position }}</span><br>
-                    <span style="font-size: 0.8em; color: #999;">({{ emp.id }})</span>
-                </td>
-                
-                <td style="vertical-align: top;">
-                    {% set items = deduction_map[emp.id] %}
-                    {% if items %}
-                        <ul style="list-style: none; padding: 0; margin: 0;">
-                        {% for item in items %}
-                            <li style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 5px 0;">
-                                <span>{{ item.deduction_name }} : <strong style="color: #e74c3c;">-{{ item.amount|comma }}원</strong></span>
-                                <form action="{{ url_for('delete_deduction', deduction_id=item.id) }}" method="POST" style="display: inline;">
-                                    <button type="submit" class="delete-notice-btn" onclick="return confirm('삭제하시겠습니까?');">X</button>
-                                </form>
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <span style="color: #ccc;">등록된 추가 공제가 없습니다.</span>
-                    {% endif %}
-                </td>
-                
-                <td style="vertical-align: top; background-color: #f9f9f9;">
-                    <form action="{{ url_for('add_deduction') }}" method="POST" style="display: flex; gap: 5px; align-items: center;">
-                        <input type="hidden" name="employee_id" value="{{ emp.id }}">
-                        <input type="text" name="deduction_name" placeholder="항목명" required style="width: 120px; font-size: 0.9em;">
-                        <input type="text" name="amount" placeholder="금액" required style="width: 80px; text-align: right; font-size: 0.9em;">
-                        <button type="submit" class="btn sub-action-btn" style="padding: 5px 10px; font-size: 0.9em;">추가</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     </div>
 </div>
 {% endblock %}

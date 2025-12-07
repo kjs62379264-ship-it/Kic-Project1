@@ -6,27 +6,14 @@
 <style>
     /* 화면 꽉 채우기 레이아웃 */
     .content-grid {
-        height: 100%;          
-        overflow: hidden;      
-        padding-bottom: 0; 
-        display: grid;
-        grid-template-columns: 1fr 1fr; 
-        grid-template-rows: 100%;       
-        gap: 20px;
+        height: 100%; overflow: hidden; padding-bottom: 0; 
+        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 100%; gap: 20px;
     }
-
     .card {
-        height: 100% !important;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        margin-bottom: 0 !important;
+        height: 100% !important; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0 !important;
     }
-
     .card-body {
-        flex-grow: 1;
-        overflow-y: auto;
-        padding: 20px;
+        flex-grow: 1; overflow-y: auto; padding: 20px;
     }
 </style>
 {% endblock %}
@@ -36,27 +23,21 @@
 <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
     <div class="card-header">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            
             <span style="font-size: 1.1em; font-weight: bold;">
                 📄 {{ selected_year }}년 {{ selected_month }}월 급여 명세서
             </span>
-
             <div style="display: flex; gap: 10px; align-items: center;">
-                <form method="GET" action="{{ url_for('my_salary') }}" style="margin: 0;">
-                    <select name="period" onchange="this.form.submit()" 
-                            style="padding: 5px 10px; border-radius: 5px; border: 1px solid #ccc; cursor: pointer; font-size: 0.9em;">
-                        {% for y, m in available_periods %}
-                            <option value="{{ y }}-{{ m }}" {% if y == selected_year and m == selected_month %}selected{% endif %}>
-                                {{ y }}년 {{ m }}월
-                            </option>
-                        {% endfor %}
+                <form method="GET" action="{{ url_for('my_salary') }}" style="display: flex; gap: 5px; margin: 0;">
+                    <select name="year" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
+                        {% for y in range(2024, 2027) %}<option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}년</option>{% endfor %}
                     </select>
+                    <select name="month" style="padding: 5px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
+                        {% for m in range(1, 13) %}<option value="{{ m }}" {% if m == selected_month %}selected{% endif %}>{{ m }}월</option>{% endfor %}
+                    </select>
+                    <button type="submit" class="sub-action-btn header-btn" style="padding: 4px 10px; font-size: 0.9em;">이동</button>
                 </form>
-
                 {% if payment %}
-                <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em;">
-                    🖨️ 인쇄
-                </a>
+                <a href="{{ url_for('print_salary', payment_id=payment.id) }}" target="_blank" class="sub-action-btn" style="padding: 4px 10px; font-size: 0.9em;">🖨️ 인쇄</a>
                 {% endif %}
             </div>
         </div>
@@ -72,7 +53,8 @@
         <table class="employee-table" style="width: 100%;">
             <thead>
                 <tr>
-                    <th>지급 항목</th><th>금액</th><th>공제 항목</th><th>금액</th>
+                    <th style="width: 25%;">지급 항목</th><th style="width: 25%;">금액</th>
+                    <th style="width: 25%;">공제 항목</th><th style="width: 25%;">금액</th>
                 </tr>
             </thead>
             <tbody>
@@ -81,33 +63,28 @@
                     <td>국민연금</td><td style="text-align:right; color: #e74c3c;">{{ payment.national_pension|comma }}</td>
                 </tr>
                 <tr>
-                    <td>수당 합계</td><td style="text-align:right;">{{ payment.total_allowance|comma }}</td>
+                    <td>기타 수당</td><td style="text-align:right;">{{ payment.allowance_other|comma }}</td>
                     <td>건강보험</td><td style="text-align:right; color: #e74c3c;">{{ payment.health_insurance|comma }}</td>
                 </tr>
                 <tr>
-                    <td>야근수당</td><td style="text-align:right;">{{ payment.overtime_pay|default(0)|comma }}</td>
+                    <td>연장 근무 수당</td><td style="text-align:right;">{{ payment.allowance_extended|comma }}</td>
                     <td>장기요양</td><td style="text-align:right; color: #e74c3c;">{{ payment.care_insurance|comma }}</td>
                 </tr>
                 <tr>
-                    <td></td><td></td>
+                    <td>야간 근무 수당</td><td style="text-align:right;">{{ payment.allowance_night|comma }}</td>
                     <td>고용보험</td><td style="text-align:right; color: #e74c3c;">{{ payment.employment_insurance|comma }}</td>
                 </tr>
                 <tr>
                     <td></td><td></td>
                     <td>소득세(지방세)</td><td style="text-align:right; color: #e74c3c;">{{ payment.income_tax|comma }}({{ payment.local_tax|comma }})</td>
                 </tr>
-                
-                {% for i in range(4) %}
                 <tr>
-                    <td style="height: 35px;">&nbsp;</td> <td></td>
-                    <td></td>
-                    <td></td>
+                    <td></td><td></td>
+                    <td>기타 공제</td><td style="text-align:right; color: #e74c3c;">{{ payment.deduction_other|comma }}</td>
                 </tr>
-                {% endfor %}
 
                 <tr style="background-color: #f9f9f9; font-weight: bold; border-top: 2px solid #ddd;">
-                    <td>지급 총액</td><td style="text-align:right;">{{ (payment.total_base + payment.total_allowance + (payment.overtime_pay|default(0)))|comma }}</td>
-                    <td>공제 총액</td><td style="text-align:right; color: #e74c3c;">{{ payment.total_deduction|comma }}</td>
+                    <td>지급 총액</td><td style="text-align:right;">{{ payment.total_base + payment.total_allowance }}</td> <td>공제 총액</td><td style="text-align:right; color: #e74c3c;">{{ payment.total_deduction|comma }}</td>
                 </tr>
             </tbody>
         </table>
@@ -126,29 +103,21 @@
 
 <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
     <div class="card-header">📜 전체 급여 이력 (최신순)</div>
-    
     <div class="card-body">
         <table class="employee-table">
             <thead>
-                <tr>
-                    <th>귀속월</th>
-                    <th>지급총액</th>
-                    <th>실수령액</th>
-                    <th>상태</th>
-                </tr>
+                <tr><th>귀속월</th><th>지급총액</th><th>실수령액</th><th>상태</th></tr>
             </thead>
             <tbody>
             {% for h in history %}
                 <tr style="{% if h.payment_year == selected_year and h.payment_month == selected_month %}background-color: #fff9c4;{% endif %}">
                     <td>{{ h.payment_year }}.{{ h.payment_month }}</td>
-                    <td>{{ (h.total_base + h.total_allowance + (h.overtime_pay|default(0)))|comma }}</td>
+                    <td>{{ (h.total_base + h.total_allowance)|comma }}</td>
                     <td style="font-weight: bold;">{{ h.net_salary|comma }}</td>
                     <td><span class="status-indicator approved">지급완료</span></td>
                 </tr>
             {% else %}
-                <tr>
-                    <td colspan="4" style="text-align: center; padding: 30px; color: #7f8c8d;">급여 이력이 없습니다.</td>
-                </tr>
+                <tr><td colspan="4" style="text-align: center; padding: 30px; color: #7f8c8d;">급여 이력이 없습니다.</td></tr>
             {% endfor %}
             </tbody>
         </table>
