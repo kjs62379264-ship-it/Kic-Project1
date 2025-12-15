@@ -1016,32 +1016,124 @@ def vacation_request():
         cursor = conn.cursor()
         try:
             form_type = request.form.get('form_type')
+            
+            # ✅ 공통 데이터 (ID, 이름, 부서, 신청일, 상태)
+            # 순서: user_id, name, department, request_date, status
             common_data = (g.user['id'], g.user['name'], g.user['department'], datetime.now(), '대기')
             
+            # 1. 휴가 신청
             if form_type == 'vacation':
                 cursor.execute("""
                     INSERT INTO vacation_requests (user_id, name, department, request_date, status, 
                     request_type, start_date, end_date, reason) VALUES (?,?,?,?,?, ?,?,?,?)
                 """, common_data + (request.form['leave_type'], request.form['start_date'], request.form['end_date'], request.form['reason']))
+            
+            # 2. 근무 신청
             elif form_type == 'work':
                 dest = request.form.get('destination', '')
                 reason = request.form.get('work_reason', '')
+                # 종료일 없으면 시작일과 동일하게
                 end = request.form.get('work_end_date') or request.form['work_start_date']
+                
                 cursor.execute("""
                     INSERT INTO vacation_requests (user_id, name, department, request_date, status, 
                     request_type, start_date, end_date, reason) VALUES (?,?,?,?,?, ?,?,?,?)
                 """, common_data + (request.form['work_type'], request.form['work_start_date'], end, f"{dest} / {reason}"))
+            
+            # ✅ 3. 퇴직/휴직 신청 (추가된 부분)
+            elif form_type == 'resign':
+                r_type = request.form.get('resign_type')
+                
+                # 값 가져오기 (.get 사용으로 에러 방지)
+                start = request.form.get('resign_start_date')
+                end = request.form.get('resign_end_date')
+                
+                # 퇴직은 종료일이 없으므로 시작일과 동일하게 처리
+                if r_type == '퇴직':
+                    end = start
+                
+                # 사유 합치기
+                cat = request.form.get('resign_category', '')
+                detail = request.form.get('resign_reason', '')
+                contact = request.form.get('emergency_contact', '')
+                full_reason = f"[{cat}] {detail} / 비상연락: {contact}"
+
+                # 🚨 [수정된 쿼리] user_id를 명확하게 포함시킴
+                cursor.execute("""
+                    INSERT INTO vacation_requests (
+                        user_id, 
+                        name, 
+                        department, 
+                        request_date, 
+                        status, 
+                        request_type, 
+                        start_date, 
+                        end_date, 
+                        reason
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, common_data + (r_type, start, end, full_reason))
                 
             conn.commit()
             flash("신청이 완료되었습니다.", "success")
+            
         except Exception as e:
             conn.rollback()
-            flash(f"오류: {e}", "error")
+            print(f"Error: {e}") # 터미널에서 에러 확인용
+            flash(f"오류가 발생했습니다: {e}", "error")
+            
         finally:
             conn.close()
+            
+        # 신청 후 현재 페이지로 리다이렉트 (새로고침 효과)
         return redirect(url_for('vacation_request'))
-    return render_template('vacation_request.html', today_display_date=datetime.now().strftime('%Y년 %m월 %d일'))
 
+    return render_template('vacation_request.html', today_display_date=datetime.now().strftime('%Y년 %m월 %d일'))
+# ==========================================
+# [관리자] 근태 요청 상태 변경 (이름 변경됨: process_request -> admin_process_request)
+# ==========================================
+# ✅ URL도 겹치지 않게 /admin/... 을 앞에 붙였습니다.
+@app.route('/admin/process_request/<int:request_id>/<action>', methods=['POST'])
+@login_required
+def admin_process_request(request_id, action):  # ✅ 함수 이름 변경!
+    # 관리자 체크 (필요시 주석 해제)
+    # if g.user['role'] != 'admin':
+    #     return redirect(url_for('dashboard'))
+
+    conn = sqlite3.connect('employees.db')
+    cursor = conn.cursor()
+    
+    try:
+        new_status = ''
+        msg = ''
+        
+        if action == 'approve':
+            new_status = '승인'
+            msg = '요청이 [승인] 처리되었습니다.'
+        elif action == 'reject':
+            new_status = '반려'
+            msg = '요청이 [반려] 처리되었습니다.'
+        elif action == 'reset':  
+            new_status = '대기'
+            msg = '요청이 [대기] 상태로 복구되었습니다.'
+        
+        cursor.execute("""
+            UPDATE vacation_requests 
+            SET status = ? 
+            WHERE id = ?
+        """, (new_status, request_id))
+        
+        conn.commit()
+        flash(msg, 'success')
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Error processing request: {e}")
+        flash(f"처리 중 오류 발생: {e}", 'error')
+        
+    finally:
+        conn.close()
+        
+    return redirect(url_for('attendance_request'))
 @app.route('/request/update/<int:req_id>/<action>', methods=['POST'])
 @admin_required
 def update_request_status(req_id, action):

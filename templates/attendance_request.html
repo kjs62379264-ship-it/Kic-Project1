@@ -31,6 +31,63 @@
         overflow-y: auto;
         padding: 10px 20px;
     }
+
+    /* ✅ [추가] 모달(팝업) 스타일 */
+    .modal-overlay {
+        display: none; /* 평소엔 숨김 */
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background-color: rgba(0, 0, 0, 0.5); /* 반투명 검은 배경 */
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background-color: white;
+        padding: 30px;
+        border-radius: 10px;
+        width: 350px;
+        text-align: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+
+    .modal-title {
+        font-size: 1.2em;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: #2c3e50;
+    }
+
+    .modal-btn-group {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .modal-btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 5px;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background 0.2s;
+    }
+
+    .btn-approve { background-color: #2ecc71; color: white; }
+    .btn-approve:hover { background-color: #27ae60; }
+
+    .btn-reject { background-color: #e74c3c; color: white; }
+    .btn-reject:hover { background-color: #c0392b; }
+
+    .btn-reset { background-color: #f39c12; color: white; }
+    .btn-reset:hover { background-color: #d35400; }
+
+    .btn-cancel { background-color: #95a5a6; color: white; }
+    .btn-cancel:hover { background-color: #7f8c8d; }
 </style>
 {% endblock %}
 
@@ -94,7 +151,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 30px 0;">
+                    <td colspan="6" style="text-align: center; color: #7f8c8d; padding: 30px 0;">
                         현재 대기 중인 요청이 없습니다.
                     </td>
                 </tr>
@@ -113,13 +170,14 @@
         <table class="employee-table" style="background-color: #f9f9f9;">
             <thead>
                 <tr>
-                    <th style="width: 15%;">신청인</th>
+                    <th style="width: 10%;">신청인</th>
                     <th style="width: 10%;">부서</th>
                     <th style="width: 10%;">유형</th>
-                    <th style="width: 25%;">기간</th>
+                    <th style="width: 20%;">기간</th>
                     <th>사유</th>
                     <th style="width: 10%;">신청일</th>
-                    <th style="width: 10%; text-align: center;">상태</th>
+                    <th style="width: 8%;">현재 상태</th>
+                    <th style="width: 10%; text-align: center;">상태 변경</th>
                 </tr>
             </thead>
             <tbody style="color: #555;">
@@ -131,6 +189,7 @@
                     <td>{{ req.start_date }} ~ {{ req.end_date }}</td>
                     <td style="text-align: left;">{{ req.reason }}</td>
                     <td>{{ req.request_date.split(' ')[0] }}</td>
+                    
                     <td style="text-align: center; font-weight: bold;">
                         {% if req.status == '승인' %}
                             <span style="color: #2ecc71;">승인됨</span>
@@ -138,10 +197,18 @@
                             <span style="color: #e74c3c;">반려됨</span>
                         {% endif %}
                     </td>
+
+                    <td style="text-align: center;">
+                        <button type="button" class="btn sub-action-btn" 
+                                style="padding: 5px 15px; background-color: #3498db; font-size: 0.8em;"
+                                onclick="openModal('{{ req.id }}', '{{ req.name }}')">
+                            수정
+                        </button>
+                    </td>
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center; color: #7f8c8d; padding: 50px 0;">
+                    <td colspan="8" style="text-align: center; color: #7f8c8d; padding: 50px 0;">
                         처리된 내역이 없습니다.
                     </td>
                 </tr>
@@ -150,5 +217,101 @@
         </table>
     </div>
 </div>
+
+<div id="statusModal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-title">
+            <span id="modalTargetName" style="color: #3498db;"></span>님의 요청 처리
+        </div>
+        
+        <p style="margin-bottom: 20px; color: #7f8c8d; font-size: 0.9em;">
+            변경할 상태를 선택해주세요.
+        </p>
+
+        <form id="modalForm" method="POST">
+            <div class="modal-btn-group">
+                <button type="button" class="modal-btn btn-approve" onclick="submitStatus('approve')">
+                    승인으로 변경
+                </button>
+
+                <button type="button" class="modal-btn btn-reject" onclick="submitStatus('reject')">
+                    반려로 변경
+                </button>
+
+                <button type="button" class="modal-btn btn-reset" onclick="submitStatus('reset')">
+                    대기(미처리)로 변경
+                </button>
+
+                <button type="button" class="modal-btn btn-cancel" onclick="closeModal()">
+                    닫기
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let currentRequestId = null;
+
+    // 1. 모달 열기 함수
+    function openModal(requestId, userName) {
+        currentRequestId = requestId;
+        
+        // 모달에 이름 표시
+        document.getElementById('modalTargetName').innerText = userName;
+        
+        // 모달 보이기
+        document.getElementById('statusModal').style.display = 'flex';
+    }
+
+    // 2. 모달 닫기 함수
+    function closeModal() {
+        document.getElementById('statusModal').style.display = 'none';
+        currentRequestId = null;
+    }
+
+    // 3. 상태 변경 제출 함수
+    function submitStatus(action) {
+        if (!currentRequestId) return;
+
+        let confirmMsg = "";
+        if (action === 'approve') confirmMsg = "정말 [승인] 상태로 변경하시겠습니까?";
+        if (action === 'reject') confirmMsg = "정말 [반려] 상태로 변경하시겠습니까?";
+        if (action === 'reset') confirmMsg = "정말 [대기] 상태로 되돌리시겠습니까?";
+
+        if (confirm(confirmMsg)) {
+            // 폼의 action 속성을 동적으로 변경 (/process_request/1/approve 등)
+            const form = document.getElementById('modalForm');
+            form.action = `/process_request/${currentRequestId}/${action}`;
+            form.submit();
+        }
+    }
+
+    // (선택) 모달 바깥 배경 누르면 닫기
+    document.getElementById('statusModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModal();
+        }
+    });
+    // 3. 상태 변경 제출 함수
+    function submitStatus(action) {
+        if (!currentRequestId) return;
+
+        let confirmMsg = "";
+        if (action === 'approve') confirmMsg = "정말 [승인] 상태로 변경하시겠습니까?";
+        if (action === 'reject') confirmMsg = "정말 [반려] 상태로 변경하시겠습니까?";
+        if (action === 'reset') confirmMsg = "정말 [대기] 상태로 되돌리시겠습니까?";
+
+        if (confirm(confirmMsg)) {
+            // 폼의 action 속성을 동적으로 변경
+            const form = document.getElementById('modalForm');
+            
+            // ✅ [수정] 주소를 '/process_request/...' 에서 '/admin/process_request/...' 로 변경
+            form.action = `/admin/process_request/${currentRequestId}/${action}`;
+            
+            form.submit();
+        }
+    }
+</script>
 
 {% endblock %}

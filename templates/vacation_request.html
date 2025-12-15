@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}근무/휴가 신청{% endblock %}
+{% block title %}근무/휴가/퇴직 신청{% endblock %}
 {% block page_body_class %}vacation-request-page{% endblock %}
 
 {% block custom_styles %}
@@ -28,12 +28,11 @@
         flex-grow: 1;
         overflow-y: auto;
         padding: 20px;
-        /* ✅ [핵심] 폼 내부 요소를 flex로 제어하기 위해 */
         display: flex; 
         flex-direction: column; 
     }
 
-    /* ✅ [핵심] 폼 자체도 Flex Column으로 만들어 버튼을 바닥으로 밈 */
+    /* 폼 자체도 Flex Column으로 만들어 버튼을 바닥으로 밈 */
     #request-form {
         display: flex;
         flex-direction: column;
@@ -46,9 +45,10 @@
 
 <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
     <div class="card-header">
-        <div style="display: flex; width: 100%; justify-content: space-around;">
-            <button id="btn-show-leave" class="btn main-action-btn" style="width: 48%;" onclick="showForm('leave')">휴가 신청</button>
-            <button id="btn-show-work" class="btn sub-action-btn" style="width: 48%; background-color: #7f8c8d;" onclick="showForm('work')">근무 신청 (외근/출장)</button>
+        <div style="display: flex; width: 100%; justify-content: space-between; gap: 5px;">
+            <button id="btn-show-leave" class="btn main-action-btn" style="flex: 1;" onclick="showForm('leave')">휴가 신청</button>
+            <button id="btn-show-work" class="btn sub-action-btn" style="flex: 1; background-color: #7f8c8d;" onclick="showForm('work')">근무 신청</button>
+            <button id="btn-show-resign" class="btn sub-action-btn" style="flex: 1; background-color: #7f8c8d;" onclick="showForm('resign')">퇴·휴직 신청</button>
         </div>
     </div>
     
@@ -123,6 +123,48 @@
                 </div>
             </div>
 
+            <div id="resign-form-section" style="display: none;">
+                <div class="form-group">
+                    <label>신청 구분</label>
+                    <div style="display: flex; gap: 20px; padding: 5px 0;">
+                        <label style="cursor: pointer;">
+                            <input type="radio" name="resign_type" value="휴직" checked onchange="handleResignTypeChange()"> 휴직 신청
+                        </label>
+                        <label style="cursor: pointer;">
+                            <input type="radio" name="resign_type" value="퇴직" onchange="handleResignTypeChange()"> 퇴직 신청
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="resign_category">사유 구분 (선택)</label>
+                    <select id="resign_category" name="resign_category" onchange="updatePreview()">
+                        <option value="">-- 선택해주세요 --</option>
+                        </select>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label id="label_resign_start">휴직 시작일</label>
+                        <input type="date" id="resign_start_date" name="resign_start_date" onchange="updatePreview()">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label id="label_resign_end">휴직 종료일</label>
+                        <input type="date" id="resign_end_date" name="resign_end_date" onchange="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="resign_reason">상세 사유 (구체적 기술)</label>
+                    <textarea id="resign_reason" name="resign_reason" rows="5" placeholder="위에서 선택한 사유에 대한 구체적인 내용을 작성해주세요." oninput="updatePreview()"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="emergency_contact">비상 연락처</label>
+                    <input type="text" id="emergency_contact" name="emergency_contact" placeholder="010-XXXX-XXXX" oninput="updatePreview()">
+                </div>
+            </div>
+
             <div class="form-actions" style="margin-top: auto; padding-top: 20px;">
                 <button type="submit" class="btn main-action-btn">최종 신청 및 제출</button>
                 <a href="{{ url_for('my_attendance') }}" class="btn sub-action-btn">취소</a>
@@ -172,13 +214,34 @@
                 </div>
             </div>
 
-            <p style="text-align: right; margin-top: 30px; font-size: 0.9em;">
+            <div id="preview-resign-template" style="display: none;">
+                <p id="preview-resign-main-title" style="text-align: center; font-size: 1.5em; font-weight: bold; margin-bottom: 40px; text-decoration: underline;">휴직원</p>
+                
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; font-size: 0.9em;">
+                    <tr><th style="border: 1px solid #333; padding: 10px; width: 30%; background-color: #f0f0f0;">소속</th><td style="border: 1px solid #333; padding: 10px;">{{ g.user['department'] }}</td></tr>
+                    <tr><th style="border: 1px solid #333; padding: 10px; background-color: #f0f0f0;">직위</th><td style="border: 1px solid #333; padding: 10px;">{{ g.user['position'] }}</td></tr>
+                    <tr><th style="border: 1px solid #333; padding: 10px; background-color: #f0f0f0;">성명</th><td style="border: 1px solid #333; padding: 10px;">{{ g.user['name'] }}</td></tr>
+                </table>
+
+                <p style="font-size: 1em; margin-bottom: 20px; line-height: 2;">
+                    상기 본인은 <br>
+                    <span id="preview-resign-reason-text" style="font-weight: bold; border-bottom: 1px solid #000; padding: 0 10px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> 의 사유로 인하여<br>
+                    이에 <span id="preview-resign-type-text" style="font-weight: bold;">휴직원</span>을 제출하오니 재가 바랍니다.
+                </p>
+
+                <div style="border: 1px solid #ccc; padding: 15px; margin-top: 20px; font-size: 0.9em;">
+                    <p><strong>• 기간/일자:</strong> <span id="preview-resign-date" style="color: #007bff;">[날짜 입력 필요]</span></p>
+                    <p><strong>• 비상 연락처:</strong> <span id="preview-resign-contact">-</span></p>
+                </div>
+            </div>
+
+            <p style="text-align: right; margin-top: 40px; font-size: 0.9em;">
                 <span id="preview-date">{{ today_display_date }}</span> 
                 <br><br>
                 신청인: <span style="font-weight: bold; text-decoration: none;">{{ g.user['name'] }}</span> (서명 또는 인) 
             </p>
-            <p style="text-align: center; margin-top: 30px; font-weight: bold;">
-                주식회사 I-TEK 대표이사 김명지
+            <p style="text-align: center; margin-top: 50px; font-weight: bold; font-size: 1.1em;">
+                주식회사 I-TEK 대표이사 귀하
             </p>
         </div>
     </div>
@@ -195,27 +258,56 @@
     window.showForm = function(formName) {
         const leaveSection = document.getElementById('leave-form-section');
         const workSection = document.getElementById('work-form-section');
+        const resignSection = document.getElementById('resign-form-section');
+
         const btnLeave = document.getElementById('btn-show-leave');
         const btnWork = document.getElementById('btn-show-work');
+        const btnResign = document.getElementById('btn-show-resign');
+
         const formTypeInput = document.getElementById('form_type');
         
         const leaveInputs = leaveSection.querySelectorAll('select, input, textarea');
         const workInputs = workSection.querySelectorAll('select, input, textarea');
+        const resignInputs = resignSection.querySelectorAll('select, input, textarea');
+
+        // 버튼 초기화
+        [btnLeave, btnWork, btnResign].forEach(btn => {
+            btn.className = 'btn sub-action-btn';
+            btn.style.backgroundColor = '#7f8c8d';
+        });
 
         if (formName === 'leave') {
-            leaveSection.style.display = 'block'; workSection.style.display = 'none'; formTypeInput.value = 'vacation';
-            leaveInputs.forEach(el => el.disabled = false); workInputs.forEach(el => el.disabled = true);
+            leaveSection.style.display = 'block'; workSection.style.display = 'none'; resignSection.style.display = 'none';
+            formTypeInput.value = 'vacation';
+            leaveInputs.forEach(el => el.disabled = false); 
+            workInputs.forEach(el => el.disabled = true);
+            resignInputs.forEach(el => el.disabled = true);
             btnLeave.className = 'btn main-action-btn'; btnLeave.style.backgroundColor = '';
-            btnWork.className = 'btn sub-action-btn'; btnWork.style.backgroundColor = '#7f8c8d';
-        } else { 
-            leaveSection.style.display = 'none'; workSection.style.display = 'block'; formTypeInput.value = 'work';
-            leaveInputs.forEach(el => el.disabled = true); workInputs.forEach(el => el.disabled = false);
+
+        } else if (formName === 'work') {
+            leaveSection.style.display = 'none'; workSection.style.display = 'block'; resignSection.style.display = 'none';
+            formTypeInput.value = 'work';
+            leaveInputs.forEach(el => el.disabled = true); 
+            workInputs.forEach(el => el.disabled = false);
+            resignInputs.forEach(el => el.disabled = true);
             btnWork.className = 'btn main-action-btn'; btnWork.style.backgroundColor = '';
-            btnLeave.className = 'btn sub-action-btn'; btnLeave.style.backgroundColor = '#7f8c8d';
+
+        } else { // resign
+            leaveSection.style.display = 'none'; workSection.style.display = 'none'; resignSection.style.display = 'block';
+            formTypeInput.value = 'resign';
+            leaveInputs.forEach(el => el.disabled = true); 
+            workInputs.forEach(el => el.disabled = true);
+            resignInputs.forEach(el => el.disabled = false);
+            btnResign.className = 'btn main-action-btn'; btnResign.style.backgroundColor = '';
+            
+            handleResignTypeChange(); // 옵션 초기화
         }
-        handleWorkTypeChange(true); updatePreview();
+        
+        if(formName === 'work') handleWorkTypeChange(true);
+        updatePreview();
     }
     
+    // 근무 유형 변경 핸들러
     window.handleWorkTypeChange = function(isFormToggle = false) {
         const workType = document.getElementById('work_type').value;
         const startDateInput = document.getElementById('work_start_date');
@@ -233,34 +325,91 @@
         }
         if (!isFormToggle) updatePreview();
     }
+
+    // ✅ [핵심] 퇴직/휴직 라디오 변경 시 -> 카테고리 옵션 교체
+    window.handleResignTypeChange = function() {
+        const resignType = document.querySelector('input[name="resign_type"]:checked').value;
+        const startDateInput = document.getElementById('resign_start_date');
+        const endDateInput = document.getElementById('resign_end_date');
+        const startLabel = document.getElementById('label_resign_start');
+        const endLabel = document.getElementById('label_resign_end');
+        const categorySelect = document.getElementById('resign_category');
+
+        // 1. 카테고리 옵션 동적 변경
+        categorySelect.innerHTML = '<option value="">-- 사유 선택 --</option>';
+        if (resignType === '휴직') {
+            const leaveReasons = ['개인 질병(신병 치료)', '육아 휴직', '가족 돌봄 휴직', '유학/연수', '기타'];
+            leaveReasons.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.textContent = r;
+                categorySelect.appendChild(opt);
+            });
+        } else { // 퇴직
+            const resignReasons = ['일신상의 사유', '이직/전직', '진학/유학', '건강상의 이유', '결혼/출산', '기타'];
+            resignReasons.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r;
+                opt.textContent = r;
+                categorySelect.appendChild(opt);
+            });
+        }
+
+        // 2. 날짜 입력칸 조정
+        if (resignType === '퇴직') {
+            startLabel.textContent = "퇴직 예정일";
+            endLabel.textContent = "-";
+            endDateInput.disabled = true; 
+            endDateInput.style.backgroundColor = '#e9ecef';
+            endDateInput.value = '';
+        } else {
+            startLabel.textContent = "휴직 시작일";
+            endLabel.textContent = "휴직 종료일";
+            endDateInput.disabled = false;
+            endDateInput.style.backgroundColor = '';
+        }
+        updatePreview();
+    }
     
+    // 미리보기 업데이트
     window.updatePreview = function() {
         const form = document.getElementById('request-form');
         const formType = form.elements['form_type'].value;
         const previewTitle = document.getElementById('preview-title');
+        
         const leaveTemplate = document.getElementById('preview-leave-template');
         const workTemplate = document.getElementById('preview-work-template');
+        const resignTemplate = document.getElementById('preview-resign-template');
+
+        leaveTemplate.style.display = 'none';
+        workTemplate.style.display = 'none';
+        resignTemplate.style.display = 'none';
 
         if (formType === 'vacation') {
             previewTitle.textContent = '휴가 신청서 (미리보기)';
-            leaveTemplate.style.display = 'block'; workTemplate.style.display = 'none';
+            leaveTemplate.style.display = 'block'; 
+            
             const leaveType = form.elements['leave_type'].value;
             const startDate = form.elements['start_date'].value;
             const endDate = form.elements['end_date'].value;
             const reason = form.elements['reason'].value.trim();
+            
             document.getElementById('preview-leave-type').textContent = leaveType || '[선택 필요]';
             document.getElementById('preview-leave-reason').textContent = reason || '-';
             let durationText = '[날짜 입력 필요]';
             if (startDate && endDate) durationText = `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
             document.getElementById('preview-leave-duration').textContent = durationText;
-        } else {
+
+        } else if (formType === 'work') {
             previewTitle.textContent = '근무 신청서 (미리보기)';
-            leaveTemplate.style.display = 'none'; workTemplate.style.display = 'block';
+            workTemplate.style.display = 'block';
+
             const workType = form.elements['work_type'].value;
             const workStartDate = form.elements['work_start_date'].value;
             const workEndDate = form.elements['work_end_date'].value;
             const destination = form.elements['destination'].value.trim();
             const workReason = form.elements['work_reason'].value.trim();
+
             document.getElementById('preview-work-type').textContent = workType || '[선택 필요]';
             document.getElementById('preview-work-destination').textContent = destination || '-';
             document.getElementById('preview-work-reason').textContent = workReason || '-';
@@ -271,6 +420,37 @@
                 if (workStartDate && workEndDate) dateText = `${formatDate(workStartDate)} ~ ${formatDate(workEndDate)}`;
             }
             document.getElementById('preview-work-date').textContent = dateText;
+
+        } else { // resign
+            const resignType = document.querySelector('input[name="resign_type"]:checked').value;
+            previewTitle.textContent = resignType === '퇴직' ? '사직서 (미리보기)' : '휴직원 (미리보기)';
+            resignTemplate.style.display = 'block';
+
+            const startDate = document.getElementById('resign_start_date').value;
+            const endDate = document.getElementById('resign_end_date').value;
+            const category = document.getElementById('resign_category').value; // 구분
+            const reasonDetail = document.getElementById('resign_reason').value.trim(); // 상세
+            const contact = document.getElementById('emergency_contact').value.trim();
+
+            document.getElementById('preview-resign-main-title').textContent = resignType === '퇴직' ? '사 직 서' : '휴 직 원';
+            document.getElementById('preview-resign-type-text').textContent = resignType === '퇴직' ? '사직서' : '휴직원';
+            
+            // ✅ [핵심] 구분 + 상세 내용을 합쳐서 보여줌
+            let combinedReason = '';
+            if (category) combinedReason += `[${category}] `;
+            if (reasonDetail) combinedReason += reasonDetail;
+            if (!combinedReason) combinedReason = '   (사유 입력)   ';
+            
+            document.getElementById('preview-resign-reason-text').textContent = combinedReason;
+            document.getElementById('preview-resign-contact').textContent = contact || '-';
+
+            let dateText = '[날짜 입력 필요]';
+            if (resignType === '퇴직') {
+                if (startDate) dateText = `${formatDate(startDate)} (퇴직 희망일)`;
+            } else {
+                if (startDate && endDate) dateText = `${formatDate(startDate)} ~ ${formatDate(endDate)}`;
+            }
+            document.getElementById('preview-resign-date').textContent = dateText;
         }
     };
 
@@ -280,8 +460,13 @@
             el.addEventListener('input', updatePreview);
             el.addEventListener('change', updatePreview);
         });
+
         document.getElementById('work_type').addEventListener('change', handleWorkTypeChange);
         document.getElementById('work_start_date').addEventListener('change', handleWorkTypeChange);
+        
+        const radioButtons = document.querySelectorAll('input[name="resign_type"]');
+        radioButtons.forEach(radio => radio.addEventListener('change', handleResignTypeChange));
+
         showForm('leave'); 
     });
 </script>
