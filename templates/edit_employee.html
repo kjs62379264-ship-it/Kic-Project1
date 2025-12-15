@@ -142,7 +142,7 @@
 
             <div class="form-actions" style="margin-top: 30px; padding-bottom: 10px;">
                 <button type="submit" class="btn main-action-btn">수정 완료</button>
-                <a href="{{ url_for('employee_detail', employee_id=employee['id']) }}" class="btn sub-action-btn">취소</a>
+                <a href="{{ url_for('hr_management', open_modal=employee['id']) }}" class="btn sub-action-btn">취소</a>
             </div>
         </form>
     </div>

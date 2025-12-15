@@ -1,13 +1,65 @@
 {% extends "base.html" %}
 
-{% block title %}{{ notice.title }} - 공지사항{% endblock %}
+{% block title %}공지사항 상세{% endblock %}
 
+{% block custom_styles %}
+<style>
+    /* 1. 화면 꽉 채우기 레이아웃 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden;
+        padding-bottom: 0;
+        grid-template-rows: 100%; /* 카드 하나가 꽉 차게 */
+    }
+
+    /* 2. 카드 설정 (높이 100%) */
+    .card {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+    }
+
+    /* 3. 본문 스크롤 영역 */
+    .card-body {
+        flex-grow: 1;
+        overflow-y: auto; /* 내용이 길면 스크롤 */
+        padding: 40px 50px; /* 읽기 편하게 여백 넉넉히 */
+        line-height: 1.6;
+    }
+
+    /* 상세 타이포그래피 */
+    .notice-title {
+        font-size: 1.8em;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 10px;
+    }
+
+    .notice-meta {
+        color: #95a5a6;
+        font-size: 0.95em;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .notice-content {
+        font-size: 1.1em;
+        color: #34495e;
+        white-space: pre-wrap; /* 줄바꿈 유지 */
+    }
+</style>
+{% endblock %}
 {% block page_content %}
 <div class="card" style="grid-column: 1 / 3;">
     <div class="card-header employee-list-header">
         <span>{{ notice.title }}</span>
         
-        <a href="{{ url_for('add_notice_page') }}" class="sub-action-btn header-btn">🔙 목록으로</a>
+        <a href="{{ url_for('add_notice_page') }}" class="sub-action-btn header-btn">목록으로</a>
     </div>
     
     <div class="card-body">

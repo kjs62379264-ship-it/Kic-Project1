@@ -86,7 +86,7 @@
             <form method="GET" action="{{ url_for('attendance') }}" style="display: flex; align-items: center; gap: 5px; margin: 0;">
                  <input type="date" name="date" value="{{ request.args.get('date', '') }}" 
                         style="padding: 5px; border-radius: 5px; border: 1px solid #ccc; height: 36px; box-sizing: border-box;">
-                 <button type="submit" class="sub-action-btn search-btn">조회</button>
+                 
             </form>
             <a href="{{ url_for('attendance') }}" class="sub-action-btn search-btn" 
                style="text-decoration: none; display: inline-block; text-align: center;">
@@ -171,12 +171,15 @@
             {% for emp in employees %}
             <tr style="{% if emp['status'] == '퇴근' %}background-color: #f9f9f9; color: #aaa;{% elif emp['status'] == '휴가' %}background-color: #f7f7f7; color: #999;{% elif emp['status'] == '부재' %}background-color: #ffebee;{% elif emp['status'] in ['외근', '출장'] %}background-color: #ecf0f1;{% endif %}">
                 <td style="font-weight: bold; text-align: center;">
-                    {% if emp['status'] == '재실' %} <span style="color: #2ecc71;">● 재실</span>
+                    {% if emp['status'] == '재실' %} <span style="color: #2ecc71;">재실</span>
+                    
+                    {% elif emp['status'] == '지각' %} <span style="color: #f39c12;">지각</span>
+                    
                     {% elif emp['status'] == '퇴근' %} <span style="color: #7f8c8d; border: 1px solid #ccc; padding: 2px 6px; border-radius: 4px; font-size: 0.9em;">👋 퇴근</span>
-                    {% elif emp['status'] == '휴가' %} <span style="color: #3498db;">✈️ 휴가</span>
-                    {% elif emp['status'] == '부재' %} <span style="color: #e74c3c;">⚠️ 부재</span>
-                    {% elif emp['status'] == '외근' %} <span style="color: #f39c12;">🚗 외근</span>
-                    {% elif emp['status'] == '출장' %} <span style="color: #1abc9c;">💼 출장</span>
+                    {% elif emp['status'] == '휴가' %} <span style="color: #3498db;">휴가</span>
+                    {% elif emp['status'] == '부재' %} <span style="color: #e74c3c;">부재</span>
+                    {% elif emp['status'] == '외근' %} <span style="color: #f39c12;">외근</span>
+                    {% elif emp['status'] == '출장' %} <span style="color: #1abc9c;">출장</span>
                     {% else %} {{ emp['status'] }} {% endif %}
                 </td>
                 <td>{{ emp['id'] }}</td> 

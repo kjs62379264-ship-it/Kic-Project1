@@ -28,7 +28,6 @@
         background-color: #fff;
         border-radius: 8px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        /* 내부 패딩 제거 (자식 요소에서 처리) */
         padding: 0; 
     }
 
@@ -97,7 +96,7 @@
     
     /* 모달 스타일 */
     .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
-    .modal-content { background-color: #fff; border-radius: 8px; width: 90%; max-width: 600px; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; position: relative; }
+    .modal-content { background-color: #fff; border-radius: 8px; width: 90%; max-width: 700px; max-height: 85vh; display: flex; flex-direction: column; padding: 20px; position: relative; }
     .close { position: absolute; top: 15px; right: 20px; font-size: 24px; cursor: pointer; }
 </style>
 {% endblock %}
@@ -108,7 +107,7 @@
     
     <div style="padding: 20px 20px 15px 20px; border-bottom: none; display: flex; justify-content: space-between; align-items: center;">
         <div style="display: flex; align-items: center; gap: 15px;">
-            <span style="font-size: 1.2em; font-weight: bold;">💰 {{ year }}년 {{ month }}월 급여 대장</span>
+            <span style="font-size: 1.2em; font-weight: bold;">{{ year }}년 {{ month }}월 급여 대장</span>
             
             <form method="GET" action="{{ url_for('salary_payroll') }}" style="display: flex; gap: 5px; align-items: center; margin: 0;">
                 <select name="year" class="search-control" style="cursor: pointer;">
@@ -123,13 +122,13 @@
 
         <div style="display: flex; gap: 5px;">
             {% if is_calculated %}
-                <a href="{{ url_for('download_salary_excel', year=year, month=month) }}" class="search-btn" style="background-color: #27ae60; text-decoration: none; display: inline-flex; align-items: center;">📥 엑셀 다운로드</a>
+                <a href="{{ url_for('download_salary_excel', year=year, month=month) }}" class="search-btn" style="background-color: #27ae60; text-decoration: none; display: inline-flex; align-items: center;">엑셀 다운로드</a>
                 <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="margin: 0;" onsubmit="return confirm('재계산 하시겠습니까?');">
-                    <button type="submit" class="search-btn btn-sub" style="display: inline-flex; align-items: center;">🔄 재계산</button>
+                    <button type="submit" class="search-btn btn-sub" style="display: inline-flex; align-items: center;">재계산</button>
                 </form>
             {% else %}
                 <form action="{{ url_for('calculate_all_salary') }}" method="POST" style="margin: 0;">
-                    <button type="submit" class="search-btn btn-main" style="display: inline-flex; align-items: center;">⚡ 일괄 계산 실행</button>
+                    <button type="submit" class="search-btn btn-main" style="display: inline-flex; align-items: center;">일괄 계산 실행</button>
                 </form>
             {% endif %}
         </div>
@@ -141,7 +140,7 @@
             <input type="hidden" name="month" value="{{ month }}">
             
             <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid #eee;">
-                <span style="font-weight: bold; color: #555;">🔍 검색 조건: </span>
+                <span style="font-weight: bold; color: #555;">검색 조건: </span>
                 
                 <select name="search_dept" class="search-control">
                     <option value="">-- 부서 전체 --</option>
@@ -182,7 +181,7 @@
                         <td style="text-align: right; color: #e74c3c;">{{ pay.total_deduction|comma }}</td>
                         <td style="text-align: right; color: #27ae60; font-weight: bold; font-size: 1.05em;">{{ pay.net_salary|comma }}</td>
                         <td style="text-align: center;">
-                            <button type="button" class="detail-btn" onclick='openSalaryModal({{ pay|tojson }})'>📄 상세</button>
+                            <button type="button" class="detail-btn" onclick='openSalaryModal({{ pay|tojson }})'>조회</button>
                         </td>
                     </tr>
                 {% else %}
@@ -210,20 +209,15 @@
     <div class="modal-content">
         <span class="close" onclick="closeSalaryModal()">&times;</span>
         <h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 0;">
-            <span id="modalName"></span>님의 급여 상세
+            <span id="modalName"></span>의 급여 상세
         </h3>
         <div class="modal-body" style="padding: 0;">
             <div style="display: flex; gap: 20px;">
-                <div style="flex: 1;">
+                
+                <div id="modalPayTableContainer" style="flex: 1;">
                     <h4 style="color: #2980b9; margin-bottom: 10px;">➕ 지급 내역</h4>
-                    <table class="employee-table" style="font-size: 0.9em; width: 100%;">
-                        <tr><th>기본급</th><td id="modalBase" style="text-align: right;"></td></tr>
-                        <tr><th>기타 수당</th><td id="modalOther" style="text-align: right;"></td></tr>
-                        <tr><th>연장 수당</th><td id="modalExtended" style="text-align: right;"></td></tr>
-                        <tr><th>야간 수당</th><td id="modalNight" style="text-align: right;"></td></tr>
-                        <tr style="border-top: 2px solid #ddd; background-color: #f9f9f9;"><th>지급계</th><td id="modalTotalPay" style="text-align: right; font-weight: bold;"></td></tr>
-                    </table>
-                </div>
+                    </div>
+
                 <div style="flex: 1;">
                     <h4 style="color: #c0392b; margin-bottom: 10px;">➖ 공제 내역</h4>
                     <table class="employee-table" style="font-size: 0.9em; width: 100%;">
@@ -246,14 +240,57 @@
 
 <script>
     function formatNumber(num) { return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+    
     function openSalaryModal(data) {
+        // 이름, 부서, 직급 표시
         document.getElementById('modalName').innerText = data.name + " " + data.position;
-        document.getElementById('modalBase').innerText = formatNumber(data.total_base);
-        document.getElementById('modalOther').innerText = formatNumber(data.allowance_other || 0);
-        document.getElementById('modalExtended').innerText = formatNumber(data.allowance_extended || 0);
-        document.getElementById('modalNight').innerText = formatNumber(data.allowance_night || 0);
-        const totalPay = data.total_base + (data.allowance_other||0) + (data.allowance_extended||0) + (data.allowance_night||0);
-        document.getElementById('modalTotalPay').innerText = formatNumber(totalPay);
+        
+        // -------------------------------------------------------
+        // ✅ [핵심] 수당 상세 분리 로직
+        // -------------------------------------------------------
+        let totalOther = data.allowance_other || 0;
+        let mealAllowance = 200000; // 식대 20만
+        let driveAllowance = (data.has_vehicle) ? 200000 : 0; // 차량 소유 시 20만
+        
+        // 기타 수당 잔액 계산 (마이너스 방지)
+        let realOther = totalOther - mealAllowance - driveAllowance;
+        if (realOther < 0) realOther = 0; 
+
+        // -------------------------------------------------------
+        // ✅ [핵심] 모달 테이블 HTML 동적 생성
+        // -------------------------------------------------------
+        let payTableHtml = `
+            <h4 style="color: #2980b9; margin-bottom: 10px;">➕ 지급 내역</h4>
+            <table class="employee-table" style="font-size: 0.9em; width: 100%;">
+                <tr><th>기본급</th><td style="text-align: right;">${formatNumber(data.total_base)}</td></tr>
+                
+                <tr><th>식대</th><td style="text-align: right;">${formatNumber(mealAllowance)}</td></tr>
+        `;
+        
+        // 자가운전보조금 (조건부 표시)
+        if (driveAllowance > 0) {
+            payTableHtml += `<tr><th>자가운전보조금</th><td style="text-align: right;">${formatNumber(driveAllowance)}</td></tr>`;
+        }
+        
+        // 나머지 수당들
+        payTableHtml += `
+                <tr><th>연장 수당</th><td style="text-align: right;">${formatNumber(data.allowance_extended || 0)}</td></tr>
+                <tr><th>야간 수당</th><td style="text-align: right;">${formatNumber(data.allowance_night || 0)}</td></tr>
+                <tr><th>기타 수당</th><td style="text-align: right;">${formatNumber(realOther)}</td></tr>
+                
+                <tr style="border-top: 2px solid #ddd; background-color: #f9f9f9;">
+                    <th>지급계</th>
+                    <td style="text-align: right; font-weight: bold;">
+                        ${formatNumber(data.total_base + data.total_allowance + (data.overtime_pay||0))}
+                    </td>
+                </tr>
+            </table>
+        `;
+        
+        // HTML 주입
+        document.getElementById('modalPayTableContainer').innerHTML = payTableHtml;
+
+        // 공제 내역 (기존 방식 유지)
         document.getElementById('modalPension').innerText = formatNumber(data.national_pension);
         document.getElementById('modalHealth').innerText = formatNumber(data.health_insurance);
         document.getElementById('modalCare').innerText = formatNumber(data.care_insurance);
@@ -262,13 +299,16 @@
         document.getElementById('modalDedOther').innerText = formatNumber(data.deduction_other || 0);
         document.getElementById('modalTotalDed').innerText = formatNumber(data.total_deduction);
         document.getElementById('modalNet').innerText = formatNumber(data.net_salary);
+        
         document.getElementById('salaryDetailModal').style.display = 'flex'; 
         document.body.style.overflow = "hidden";
     }
+    
     function closeSalaryModal() {
         document.getElementById('salaryDetailModal').style.display = 'none';
         document.body.style.overflow = "";
     }
+    
     window.onclick = function(event) { if (event.target == document.getElementById('salaryDetailModal')) closeSalaryModal(); }
 </script>
 

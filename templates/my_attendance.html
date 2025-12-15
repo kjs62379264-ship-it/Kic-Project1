@@ -229,7 +229,7 @@
 
 <div class="card card-bottom" style="grid-column: 2 / 3; grid-row: 2 / 3;"> 
     <div class="card-header">
-        <span style="flex-grow: 1;">🗓️ {{ current_month_name }} 근태 달력</span>
+        <span style="flex-grow: 1;">{{ current_month_name }} 근태 달력</span>
         
         <button class="sub-action-btn calendar-nav-btn" onclick="changeMonth({{ current_year }}, {{ current_month | int - 1 }})">&lt;</button>
         <button class="sub-action-btn calendar-nav-btn" onclick="changeMonth({{ current_year }}, {{ current_month | int + 1 }})">&gt;</button>
@@ -273,3 +273,87 @@
 </div>
 
 {% endblock %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+
+        // 1. 서버에서 넘어온 실제 데이터 (12월용)
+        var serverEvents = {{ events|tojson }};
+        
+        // 2. [연출용] 11월 데이터 강제 생성 (자바스크립트)
+        var fakeEvents = [];
+        
+        // 2025년 11월 설정
+        var year = 2025;
+        var month = 10; // JS에서 11월은 index 10
+        var lastDay = new Date(year, month + 1, 0).getDate();
+
+        // 11월 1일 ~ 30일 루프
+        for (var day = 1; day <= lastDay; day++) {
+            var date = new Date(year, month, day);
+            var dayOfWeek = date.getDay(); // 0:일, 6:토
+            
+            // 주말 제외
+            if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+            var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            
+            // 기본값: 정상 출근 (파란색)
+            var evt = {
+                title: '09:00 - 18:00',
+                start: dateStr,
+                className: 'bg-primary', // 파란색
+                allDay: true
+            };
+
+            // [특이사항 덮어쓰기]
+            if (day === 5) { // 5일: 지각
+                evt.title = '09:15 - 18:00 (지각)';
+                evt.className = 'bg-danger'; // 빨간색
+            } else if (day === 12) { // 12일: 야간
+                evt.title = '09:00 - 22:30 (야간)';
+                evt.className = 'bg-warning'; // 주황색
+            } else if (day === 19 || day === 26) { // 19, 26일: 연장
+                evt.title = '09:00 - 20:30 (연장)';
+                evt.className = 'bg-info'; // 하늘색 or 주황색
+            }
+
+            fakeEvents.push(evt);
+        }
+
+        // 3. 데이터 합치기 (서버 데이터 + 가짜 11월 데이터)
+        // 주의: 11월은 가짜 데이터만 보이게 하기 위해 서버 데이터 중 11월 것은 필터링해도 됨
+        // 하지만 지금은 단순히 합쳐서 보여줍니다.
+        var finalEvents = serverEvents.concat(fakeEvents);
+
+        // 4. 달력 렌더링
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            themeSystem: 'bootstrap',
+            initialView: 'dayGridMonth',
+            locale: 'ko',
+            headerToolbar: {
+                left: 'prev,next today',
+                center: 'title',
+                right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            events: finalEvents, // 합쳐진 이벤트 사용
+            eventClick: function(info) {
+                // 클릭 시 상세 정보 보여주기 (연출용 alert)
+                var title = info.event.title;
+                var date = info.event.start.toISOString().slice(0,10);
+                if (title.includes('지각')) {
+                    alert(`[${date}] 근태 상세\n- 상태: 지각\n- 출근: 09:15:00\n- 퇴근: 18:00:00\n- 사유: 개인 사정`);
+                } else if (title.includes('야간')) {
+                    alert(`[${date}] 근태 상세\n- 상태: 정상(야간)\n- 출근: 09:00:00\n- 퇴근: 22:30:00\n- 내용: 프로젝트 마감`);
+                } else {
+                    alert(`[${date}] 근태 상세\n- 상태: 정상\n- 출근: 09:00:00\n- 퇴근: 18:00:00`);
+                }
+            },
+            dayCellContent: function(e) {
+                e.dayNumberText = e.dayNumberText.replace('일', '');
+            }
+        });
+
+        calendar.render();
+    });
+</script>

@@ -109,8 +109,8 @@
             
             <div class="header-actions" style="display: flex; gap: 5px;">
                 {% if g.user.role == 'admin' %}
-                <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="search-btn btn-print" style="text-decoration: none; display: inline-flex; align-items: center;">🖨️ 명부 인쇄</a>
-                <a href="{{ url_for('add_employee') }}" class="search-btn btn-main" style="text-decoration: none; display: inline-flex; align-items: center;">➕ 신규 직원 등록</a>
+                <a href="{{ url_for('print_employees', **request.args) }}" target="_blank" class="search-btn btn-print" style="text-decoration: none; display: inline-flex; align-items: center;">명부 인쇄</a>
+                <a href="{{ url_for('add_employee') }}" class="search-btn btn-main" style="text-decoration: none; display: inline-flex; align-items: center;">신규 직원 등록</a>
                 {% endif %}
             </div>
         </div>

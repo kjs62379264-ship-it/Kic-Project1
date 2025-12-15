@@ -157,28 +157,37 @@
 
 {% block page_content %}
 
-    <div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
-        <div class="card-header">👋 환영합니다!</div>
+<div class="card" style="grid-column: 1 / 2; grid-row: 1 / 2;">
+        <div class="card-header" style="border-bottom: 1px solid #eee;">
+            <span style="font-weight: bold; ">현재 시각</span>
+        </div>
         <div class="card-body" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center;">
-            <h3 style="margin-bottom: 15px; color: #2c3e50;">{{ g.user.name }} {{ g.user.position }}님</h3>
-            <p style="color: #7f8c8d; margin-bottom: 30px;">오늘도 힘찬 하루 보내세요!</p>
-            <div style="display: flex; gap: 15px; width: 100%;">
-                <a href="{{ url_for('my_attendance') }}" class="btn main-action-btn" style="flex: 1; padding: 12px;">📅 나의 근태</a>
-                <a href="{{ url_for('vacation_request') }}" class="btn sub-action-btn" style="flex: 1; padding: 12px;">📝 휴가 신청</a>
+            
+            <div id="live-clock" style="font-size: 4.5em; font-weight: bold; color: #2c3e50; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace;">
+                09:30:00
             </div>
+
+            {% if not today_attendance or not today_attendance.clock_in_time %}
+            <div style="margin-top: 20px; width: 80%;">
+                <form action="{{ url_for('check_in') }}" method="POST">
+                    <input type="hidden" name="custom_time" id="dashboardCustomTime" value="">
+                    
+                </form>
+            </div>
+            {% endif %}
+
         </div>
     </div>
 
     <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
-        <div class="card-header">📊 오늘의 근무 현황 (총 {{ total_employees_count }}명)</div>
+        <div class="card-header">오늘의 근무 현황 (총 {{ total_employees_count }}명)</div>
         
         <div class="card-body" style="flex-grow: 1; overflow: hidden; padding: 10px; display: flex; align-items: center; justify-content: center;">
             
             <div class="attendance-summary-circles" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; height: auto;">
                 
                 <div class="status-circle-item">
-                    <div class="circle green-bg" 
-                 style="cursor: help;" 
+                    <div class="circle green-bg" style="cursor: help;width: 90px; height: 90px; line-height: 70px; font-size: 1.1em;" 
                  title="🏢 현재 근무: {{ status_counts['재실_상세'] }}명&#10;🏠 퇴근 완료: {{ status_counts['퇴근_상세'] }}명">
                 
                 <span class="count">{{ status_counts['출근'] }}</span>명
@@ -212,7 +221,7 @@
     </div>
 
     <div class="card" style="grid-column: 3 / 4; grid-row: 1 / 2;">
-        <div class="card-header">🌤️ 오늘의 리프레시</div>
+        <div class="card-header">오늘의 리프레시</div>
         <div class="card-body" style="display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;">
             
             <div id="weather-widget" style="margin-bottom: 20px;">
@@ -245,7 +254,7 @@
 
     <div class="card" style="grid-column: 1 / 2; grid-row: 2 / 3;">
         <div class="card-header employee-list-header" style="display: flex; align-items: center; justify-content: space-between;">
-            <span>📢 최신 공지</span>
+            <span>최신 공지</span>
             {% if g.user.role == 'admin' %}
             <a href="{{ url_for('add_notice_page') }}" class="sub-action-btn header-btn" style="font-size: 0.8em; padding: 3px 8px;">
                 ➕ 작성
@@ -269,7 +278,7 @@
     </div>
 
     <div class="card" style="grid-column: 2 / 3; grid-row: 2 / 3;">
-        <div class="card-header">🏢 부서별 인원 현황</div>
+        <div class="card-header">부서별 인원 현황</div>
         <div class="card-body" style="overflow: hidden; padding: 20px; display: flex; align-items: center; justify-content: center;">
             <div class="chart-container">
                 <canvas id="departmentChart"></canvas>
@@ -279,8 +288,7 @@
 
     <div class="card" style="grid-column: 3 / 4; grid-row: 2 / 3;">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <span>📅 {{ current_month }}월 주요 일정</span>
-            <span style="font-size: 0.8em; color: #aaa;">Hover to view</span>
+            <span>{{ current_month }}월 주요 일정</span>
         </div>
         <div class="card-body" style="display: flex; align-items: center; justify-content: center; padding: 10px;">
             
@@ -318,9 +326,43 @@
         </div>
     </div>
 
+
+
+
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ===============================================
+    // ✅ [수정] 복잡한 시뮬레이션 로직 삭제 -> 실제 시계 구현
+    // ===============================================
+    function updateClock() {
+        const now = new Date(); // 브라우저의 현재 시간 가져오기
         
+        // 시간 포맷팅 (HH:MM:SS)
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timeString = `${hours}:${minutes}:${seconds}`;
+        
+        // 1. 대시보드 메인 시계 업데이트
+        const clockEl = document.getElementById('live-clock');
+        if (clockEl) clockEl.innerText = timeString;
+
+        // 2. 사이드바 등의 hidden input 업데이트 (출퇴근 시 사용)
+        const sidebarInput = document.getElementById('sidebarCustomTime');
+        if (sidebarInput) sidebarInput.value = timeString;
+        
+        const sidebarOutInput = document.getElementById('sidebarCustomTimeOut');
+        if (sidebarOutInput) sidebarOutInput.value = timeString;
+        
+        // (대시보드 내부 폼이 있다면)
+        const dashInput = document.getElementById('dashboardCustomTime');
+        if (dashInput) dashInput.value = timeString;
+    }
+
+    // 1초마다 실행
+    setInterval(updateClock, 1000);
+    updateClock(); // 로딩되자마자 한 번 실행
         // -------------------------------------------------------
         // 1. 부서별 인원 현황 차트 초기화 (Chart.js)
         // -------------------------------------------------------

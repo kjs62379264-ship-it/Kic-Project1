@@ -30,7 +30,7 @@
 <div class="card" style="grid-column: 1 / -1;">
     <div class="card-header">
         <span>새 공지사항 작성</span>
-        <a href="{{ url_for('hr_management') }}" class="sub-action-btn header-btn">🔙 인사 현황으로</a>
+        <a href="{{ url_for('dashboard') }}" class="sub-action-btn header-btn">메인으로</a>
     </div>
     <div class="card-body">
         <form action="{{ url_for('add_notice_page') }}" method="POST" class="notice-form-full">

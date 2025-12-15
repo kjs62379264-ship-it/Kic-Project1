@@ -105,11 +105,21 @@
                     <label><input type="radio" name="gender" value="여성"> 여성</label>
                 </div>
             </div>
-
             <div class="form-group">
-                <label for="password">초기 비밀번호</label>
-                <input type="password" id="password" name="password" required>
+                <label>차량 소유 여부</label>
+                <div style="display: flex; gap: 20px; margin-top: 5px;">
+                    <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="radio" name="has_vehicle" value="1"> 
+                        <span style="font-weight: bold; color: #2c3e50;">예 (자가운전보조금 지급)</span>
+                    </label>
+                    <label style="display: inline-flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="radio" name="has_vehicle" value="0" checked> 
+                        <span>아니오</span>
+                    </label>
+                </div>
+                <small style="color: #7f8c8d;">* '예' 선택 시 월 200,000원의 자가운전보조금이 자동으로 책정됩니다.</small>
             </div>
+
 
             {% if g.user.role == 'admin' %}
             <div class="form-group">
