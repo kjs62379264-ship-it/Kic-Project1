@@ -190,8 +190,9 @@
                         <span class="search-label">지각-결근:</span>
                         <select name="late_absent_filter" class="search-control">
                             <option value="" {% if request.args.get('late_absent_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
-                            <option value="1" {% if request.args.get('late_absent_filter') == '1' %}selected{% endif %}>1회↑</option>
-                            <option value="3" {% if request.args.get('late_absent_filter') == '3' %}selected{% endif %}>3회↑</option>
+                            <option value="1" {% if request.args.get('late_absent_filter') == '1' %}selected{% endif %}>1회 이상</option>
+                            <option value="3" {% if request.args.get('late_absent_filter') == '3' %}selected{% endif %}>3회 이상</option>
+                            <option value="5" {% if request.args.get('late_absent_filter') == '5' %}selected{% endif %}>5회 이상</option>
                         </select>
                     </div>
 
@@ -199,8 +200,9 @@
                         <span class="search-label">초과근무:</span>
                         <select name="overtime_filter" class="search-control">
                             <option value="" {% if request.args.get('overtime_filter', '') == '' %}selected{% endif %}>-- 전체 --</option>
-                            <option value="1" {% if request.args.get('overtime_filter') == '1' %}selected{% endif %}>1시간↑</option>
-                            <option value="10" {% if request.args.get('overtime_filter') == '10' %}selected{% endif %}>10시간↑</option>
+                            <option value="1" {% if request.args.get('overtime_filter') == '1' %}selected{% endif %}>1시간 이상</option>
+                            <option value="10" {% if request.args.get('overtime_filter') == '10' %}selected{% endif %}>10시간 이상</option>
+                            <option value="20" {% if request.args.get('overtime_filter') == '20' %}selected{% endif %}>20시간 이상</option>
                         </select>
                     </div>
                 </div>
@@ -259,14 +261,7 @@
                 </tr>
             {% endfor %}
             
-            {# ✅ [핵심] 빈 공간 채우기 (20개 행 유지) #}
-            {% if employee_stats|length < 20 %}
-                {% for i in range(20 - employee_stats|length) %}
-                <tr style="height: 41px;">
-                    <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
-                </tr>
-                {% endfor %}
-            {% endif %}
+
             </tbody>
         </table>
     </div>

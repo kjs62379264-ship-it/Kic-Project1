@@ -38,6 +38,20 @@
         flex-direction: column;
         flex-grow: 1;
     }
+    /* ✅ [추가] 카드 헤더 안에 있는 버튼 높이 줄이기 */
+    .card-header .btn {
+        padding-top: 3px !important;    /* 위쪽 여백 축소 */
+        padding-bottom: 3px !important; /* 아래쪽 여백 축소 */
+        font-size: 1em;              /* 글자 크기 살짝 줄임 (선택 사항) */
+        height: auto !important;        /* 고정 높이 해제 */
+        line-height: 1.5;               /* 줄 간격 조정 */
+    }
+    .card-header h2 {
+        line-height: 1.25;
+        margin: 0;
+        padding: 5px 0; /* 버튼과 비슷하게 여백 부여 */
+    }
+
 </style>
 {% endblock %}
 
@@ -175,7 +189,7 @@
 
 <div class="card" style="grid-column: 2 / 3; grid-row: 1 / 2;">
     <div class="card-header">
-        <h2 id="preview-title" style="text-align: center; margin: 0; font-size: 1.1em;">
+        <h2 id="preview-title" style="text-align: center; margin: 0; font-size: 1em;">
             휴가 신청서 (미리보기)
         </h2>
     </div>
