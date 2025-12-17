@@ -2171,56 +2171,96 @@ def download_salary_excel():
         headers={"Content-disposition": f"attachment; filename=payroll_{year}_{month}.csv"}
     )
 
-@app.route('/salary/contracts', methods=['GET', 'POST'])
+@app.route('/salary_contracts', methods=['GET', 'POST'])
+@login_required
 @admin_required
 def salary_contracts():
     conn = sqlite3.connect('employees.db')
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # 1. 저장(POST) 처리
     if request.method == 'POST':
         emp_id = request.form['employee_id']
-        annual_salary = int(request.form['annual_salary'].replace(',', ''))
+        annual_salary = request.form['annual_salary']
         bank_name = request.form['bank_name']
         account_number = request.form['account_number']
-        base_salary = annual_salary // 12
         
         try:
-            cursor.execute("SELECT id FROM salary_contracts WHERE employee_id=?", (emp_id,))
-            exists = cursor.fetchone()
-            
-            if exists:
-                cursor.execute("""
-                    UPDATE salary_contracts 
-                    SET annual_salary=?, base_salary=?, bank_name=?, account_number=?
-                    WHERE employee_id=?
-                """, (annual_salary, base_salary, bank_name, account_number, emp_id))
-            else:
-                cursor.execute("""
-                    INSERT INTO salary_contracts (employee_id, annual_salary, base_salary, bank_name, account_number)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (emp_id, annual_salary, base_salary, bank_name, account_number))
-                
-            conn.commit()
-            flash(f"{emp_id} 사원의 급여 계약 정보가 저장되었습니다.", "success")
-        except Exception as e:
-            conn.rollback()
-            flash(f"저장 중 오류 발생: {e}", "error")
-            
-        return redirect(url_for('salary_contracts'))
+            base_salary = int(annual_salary) // 12
+        except:
+            base_salary = 0
 
-    cursor.execute("""
+        exist = cursor.execute("SELECT id FROM salary_contracts WHERE employee_id = ?", (emp_id,)).fetchone()
+        
+        if exist:
+            cursor.execute("""
+                UPDATE salary_contracts 
+                SET annual_salary=?, base_salary=?, bank_name=?, account_number=?, updated_at=datetime('now')
+                WHERE employee_id=?
+            """, (annual_salary, base_salary, bank_name, account_number, emp_id))
+        else:
+            cursor.execute("""
+                INSERT INTO salary_contracts (employee_id, annual_salary, base_salary, bank_name, account_number, created_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'))
+            """, (emp_id, annual_salary, base_salary, bank_name, account_number))
+            
+        conn.commit()
+        flash("계약 정보가 저장되었습니다.", "success")
+        
+        # 리다이렉트 시 검색 조건 유지
+        id_q = request.form.get('current_id_query', '')
+        name_q = request.form.get('current_name_query', '')
+        
+        conn.close()
+        return redirect(url_for('salary_contracts', id_query=id_q, name_query=name_q))
+
+    # 2. 조회(GET) 처리
+    id_query = request.args.get('id_query', '')
+    name_query = request.args.get('name_query', '')
+    dept_query = request.args.get('department_query', '')
+    pos_query = request.args.get('position_query', '')
+
+    # ✅ [핵심 수정] 관리자(홍길동) 제외 쿼리
+    # WHERE 1=1 대신 name != '홍길동'을 기본 조건으로 넣습니다.
+    # 만약 아이디로 제외하고 싶다면 e.id != 'admin' 등을 쓰면 됩니다.
+    query = """
         SELECT e.id, e.name, e.department, e.position, 
                s.annual_salary, s.base_salary, s.bank_name, s.account_number
         FROM employees e
         LEFT JOIN salary_contracts s ON e.id = s.employee_id
-        WHERE e.status = '재직' AND e.id != 'admin'
-        ORDER BY e.id DESC
-    """)
-    contracts = cursor.fetchall()
+        WHERE e.name != '홍길동'
+    """
+    params = []
+
+    # 동적 쿼리 추가 (AND로 연결)
+    if id_query:
+        query += " AND e.id LIKE ?"
+        params.append(f"%{id_query}%")
+    if name_query:
+        query += " AND e.name LIKE ?"
+        params.append(f"%{name_query}%")
+    if dept_query:
+        query += " AND e.department = ?"
+        params.append(dept_query)
+    if pos_query:
+        query += " AND e.position = ?"
+        params.append(pos_query)
+        
+    query += " ORDER BY e.id ASC"
+
+    contracts = cursor.execute(query, params).fetchall()
+
+    # 드롭다운 목록 (관리자는 제외하고 싶은 경우 여기 쿼리도 수정 가능하나, 보통은 둬도 무방함)
+    depts = [r[0] for r in cursor.execute("SELECT DISTINCT department FROM employees").fetchall()]
+    positions = [r[0] for r in cursor.execute("SELECT DISTINCT position FROM employees").fetchall()]
+
     conn.close()
     
-    return render_template('salary_contracts.html', contracts=contracts)
+    return render_template('salary_contracts.html', 
+                           contracts=contracts, 
+                           departments=depts, 
+                           positions=positions)
 
 @app.route('/salary/deductions', methods=['GET'])
 @admin_required

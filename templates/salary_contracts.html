@@ -13,7 +13,7 @@
         flex-direction: column;
     }
 
-    /* 2. 카드 설정: 남은 공간 모두 차지 */
+    /* 2. 카드 설정 */
     .card {
         flex-grow: 1;
         display: flex;
@@ -54,6 +54,44 @@
     .select-field {
         width: 100%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
     }
+
+    /* ✅ [추가] 검색 필터 스타일 (직원 조회 페이지와 통일) */
+    .search-filters {
+        display: flex; 
+        flex-wrap: wrap; 
+        gap: 15px; 
+        align-items: center;
+    }
+
+    .search-control {
+        height: 34px;
+        padding: 0 10px;
+        font-size: 0.9em;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+        outline: none;
+    }
+    .search-control:focus { border-color: #3498db; }
+
+    .search-label {
+        font-weight: bold;
+        margin-right: 5px;
+        color: #555;
+        font-size: 0.9em;
+    }
+
+    .search-btn {
+        height: 34px;
+        line-height: 32px; /* height - border*2 */
+        padding: 0 15px;
+        font-size: 0.9em;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        color: white;
+        font-weight: bold;
+    }
 </style>
 {% endblock %}
 
@@ -64,9 +102,56 @@
         <span>직원 연봉 및 계좌 관리 (총 {{ contracts|length }}명)</span>
     </div>
     
-    <div class="card-body">
-        <div style="position: sticky; top: 0; height: 15px; background-color: #ffffff; z-index: 10; width: 100%;"></div>
+    <div style="padding: 15px; border-bottom: 1px solid #e0e0e0; background-color: #fdfdfd;">
+        <form method="GET" action="{{ url_for('salary_contracts') }}">
+            <div class="search-filters">
+                
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">사번:</span>
+                    <input type="text" name="id_query" class="search-control" placeholder="사번 입력" 
+                           style="width: 100px;" value="{{ request.args.get('id_query', '') }}">
+                </div>
+                
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">이름:</span>
+                    <input type="text" name="name_query" class="search-control" placeholder="이름 입력" 
+                           style="width: 100px;" value="{{ request.args.get('name_query', '') }}">
+                </div>
 
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">부서:</span>
+                    <select name="department_query" class="search-control">
+                        <option value="">-- 전체 --</option>
+                        {% for dept in departments %}
+                            <option value="{{ dept }}" {% if request.args.get('department_query') == dept %}selected{% endif %}>
+                                {{ dept }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="display: flex; align-items: center;">
+                    <span class="search-label">직급:</span>
+                    <select name="position_query" class="search-control">
+                        <option value="">-- 전체 --</option>
+                        {% for pos in positions %}
+                            <option value="{{ pos }}" {% if request.args.get('position_query') == pos %}selected{% endif %}>
+                                {{ pos }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button type="submit" class="search-btn" style="background-color: #3498db;">검색</button>
+                    <a href="{{ url_for('salary_contracts') }}" class="search-btn" 
+                       style="background-color: #7f8c8d; text-decoration: none; display: inline-block; text-align: center;">초기화</a>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card-body">
         <table class="employee-table">
             <thead>
                 <tr>
@@ -85,6 +170,10 @@
             <tr>
                 <form method="POST" action="{{ url_for('salary_contracts') }}">
                     <input type="hidden" name="employee_id" value="{{ c.id }}">
+                    
+                    <input type="hidden" name="current_id_query" value="{{ request.args.get('id_query', '') }}">
+                    <input type="hidden" name="current_name_query" value="{{ request.args.get('name_query', '') }}">
+                    
                     <td>{{ c.id }}</td>
                     <td style="font-weight: bold;">{{ c.name }}</td>
                     <td>{{ c.department }} {{ c.position }}</td>
@@ -118,6 +207,12 @@
                         <button type="submit" class="sub-action-btn" style="padding: 5px 10px; font-size: 0.8em;">💾 저장</button>
                     </td>
                 </form>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 50px; color: #7f8c8d;">
+                    검색 조건에 해당하는 직원이 없습니다.
+                </td>
             </tr>
             {% endfor %}
             </tbody>
