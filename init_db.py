@@ -18,7 +18,8 @@ def init_database():
     tables = [
         "payroll_rates", "salary_payments", "fixed_deductions", "fixed_allowances",
         "salary_contracts", "vacation_requests", "notices", "attendance",
-        "users", "employees", "email_domains", "positions", "departments"
+        "users", "employees", "email_domains", "positions", "departments",
+        "activity_logs" # ✅ [추가] 초기화 목록에도 추가
     ]
     for table in tables: cursor.execute(f"DROP TABLE IF EXISTS {table}")
     print("기존 테이블 삭제 완료.")
@@ -65,6 +66,20 @@ def init_database():
     );""")
     cursor.execute("CREATE TABLE payroll_rates (id INTEGER PRIMARY KEY AUTOINCREMENT, national_pension_rate REAL DEFAULT 4.5, health_insurance_rate REAL DEFAULT 3.545, care_insurance_rate REAL DEFAULT 12.95, employment_insurance_rate REAL DEFAULT 0.9);")
     cursor.execute("INSERT INTO payroll_rates (id) VALUES (1)")
+
+    # ✅ [추가됨] 활동 로그 테이블 생성
+    cursor.execute("""
+    CREATE TABLE activity_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        user_name TEXT,
+        action_type TEXT,     -- INSERT, UPDATE, DELETE, LOGIN 등
+        target_category TEXT, -- 인사, 급여, 근태 등
+        details TEXT,         -- 상세 내용
+        ip_address TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    );""")
+    print("activity_logs 테이블 생성 완료.")
 
     # 4. 직원 데이터
     employees_data = [
@@ -260,6 +275,6 @@ def init_database():
 
     conn.commit(); conn.close()
     print("DB 초기화 완료.")
-
+    
 if __name__ == '__main__':
     init_database()

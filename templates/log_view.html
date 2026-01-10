@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}시스템 활동 로그{% endblock %}
+{% block page_body_class %}log-view-page{% endblock %}
+
+{% block custom_styles %}
+<style>
+    /* 1. 화면 꽉 채우기 레이아웃 */
+    .content-grid {
+        height: 100%;
+        overflow: hidden; 
+        padding-bottom: 0; 
+        display: grid;
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+    }
+
+    .card {
+        height: 100% !important;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        margin-bottom: 0 !important;
+        background: white; 
+        border-radius: 8px; 
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+
+    /* 헤더 영역 수정 (왼쪽 정렬) */
+    .card-header {
+        padding: 20px;
+        border-bottom: 1px solid #eee;
+        background-color: #fff;
+        display: flex;
+        flex-direction: column; /* 위아래 배치 */
+        gap: 15px;
+        align-items: flex-start; /* ✅ 모든 요소를 왼쪽 정렬 */
+    }
+
+    .header-top {
+        width: 100%;
+        display: flex;
+        justify-content: space-between; /* 제목은 왼쪽, 새로고침은 오른쪽 */
+        align-items: center;
+    }
+
+    /* 검색 폼 스타일 */
+    .search-form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        width: 100%; /* 폼을 가로로 꽉 채움 */
+    }
+    
+    /* 검색 라벨 스타일 */
+    .search-label {
+        font-weight: bold; 
+        color: #555; 
+        font-size: 0.9em;
+    }
+
+    .search-input {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 0.9em;
+        height: 32px;
+        box-sizing: border-box;
+    }
+
+    .search-btn {
+        padding: 0 15px;
+        height: 32px;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.9em;
+        line-height: 32px;
+    }
+    .search-btn:hover { background-color: #2980b9; }
+
+    .reset-btn {
+        padding: 0 15px;
+        height: 32px;
+        background-color: #f1f3f5;
+        border: 1px solid #ddd;
+        color: #555;
+        border-radius: 4px;
+        text-decoration: none;
+        font-size: 0.9em;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .card-body {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 0;
+    }
+
+    .log-table { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+    .log-table th { 
+        background-color: #f8f9fa; padding: 12px 15px; text-align: left; 
+        font-weight: bold; color: #555; border-bottom: 2px solid #eee; 
+        position: sticky; top: 0; z-index: 10;
+    }
+    .log-table td { padding: 12px 15px; border-bottom: 1px solid #eee; color: #333; vertical-align: middle; }
+    .log-table tr:hover { background-color: #fcfcfc; }
+
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; display: inline-block; }
+    .badge-blue { background-color: #e3f2fd; color: #1976d2; }
+    .badge-green { background-color: #e8f5e9; color: #2e7d32; }
+    .badge-red { background-color: #ffebee; color: #c62828; }
+    .badge-orange { background-color: #fff3e0; color: #ef6c00; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="content-grid">
+    <div class="card">
+        <div class="card-header">
+            <div class="header-top">
+                <h2 style="margin: 0; font-size: 1.3em; display: flex; align-items: center; gap: 10px;">
+                    시스템 활동 로그
+                </h2>
+                <button onclick="window.location.reload()" class="btn sub-action-btn" style="padding: 6px 15px; background-color: #3498db; border: 1px solid #ddd; cursor: pointer; border-radius: 4px;">
+                    ↻ 새로고침
+                </button>
+            </div>
+            
+            <form method="GET" action="{{ url_for('system_logs') }}" class="search-form">
+                
+                <span class="search-label">기간:</span>
+                <input type="date" name="start_date" class="search-input" value="{{ request.args.get('start_date', '') }}">
+                <span style="color:#999">~</span>
+                <input type="date" name="end_date" class="search-input" value="{{ request.args.get('end_date', '') }}">
+                
+                <span class="search-label" style="margin-left: 15px;">부서:</span>
+                <select name="department" class="search-input">
+                    <option value="">-- 전체 --</option>
+                    <option value="인사팀" {% if request.args.get('department') == '인사팀' %}selected{% endif %}>인사팀</option>
+                    <option value="개발팀" {% if request.args.get('department') == '개발팀' %}selected{% endif %}>개발팀</option>
+                    <option value="영업팀" {% if request.args.get('department') == '영업팀' %}selected{% endif %}>영업팀</option>
+                    <option value="경영지원팀" {% if request.args.get('department') == '경영지원팀' %}selected{% endif %}>마케팅팀</option>
+                </select>
+
+                <span class="search-label" style="margin-left: 15px;">유형:</span>
+                <select name="action_type" class="search-input">
+                    <option value="">-- 전체 --</option>
+                    <option value="LOGIN" {% if request.args.get('action_type') == 'LOGIN' %}selected{% endif %}>로그인</option>
+                    <option value="INSERT" {% if request.args.get('action_type') == 'INSERT' %}selected{% endif %}>생성/등록</option>
+                    <option value="UPDATE" {% if request.args.get('action_type') == 'UPDATE' %}selected{% endif %}>수정</option>
+                    <option value="DELETE" {% if request.args.get('action_type') == 'DELETE' %}selected{% endif %}>삭제</option>
+                </select>
+
+                <input type="text" name="keyword" class="search-input" placeholder="이름, 아이디, 내용" value="{{ request.args.get('keyword', '') }}" style="width: 180px; margin-left: 10px;">
+                
+                <button type="submit" class="search-btn">검색</button>
+                <a href="{{ url_for('system_logs') }}" class="reset-btn">초기화</a>
+            </form>
+        </div>
+        
+        <div class="card-body">
+            <table class="log-table">
+                <thead>
+                    <tr>
+                        <th style="width: 160px;">일시</th>
+                        <th style="width: 120px;">사용자</th>
+                        <th style="width: 120px;">부서</th>
+                        <th style="width: 100px;">유형</th>
+                        <th style="width: 120px;">대상</th>
+                        <th>상세 내용</th>
+                        <th style="width: 140px;">IP 주소</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td style="color: #666; font-size: 0.9em;">{{ log.timestamp }}</td>
+                        <td>
+                            <div style="font-weight: bold; color: #2c3e50;">{{ log.user_name }}</div>
+                            <div style="font-size: 0.8em; color: #999;">{{ log.user_id }}</div>
+                        </td>
+                        
+                        <td style="color: #555; font-weight: bold;">
+                            {{ log.department if log.department else '-' }}
+                        </td>
+
+                        <td>
+                            {% if log.action_type in ['DELETE', '삭제'] %}
+                                <span class="badge badge-red">{{ log.action_type }}</span>
+                            {% elif log.action_type in ['UPDATE', '수정'] %}
+                                <span class="badge badge-orange">{{ log.action_type }}</span>
+                            {% elif log.action_type in ['INSERT', '생성', '등록'] %}
+                                <span class="badge badge-green">{{ log.action_type }}</span>
+                            {% else %}
+                                <span class="badge badge-blue">{{ log.action_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-weight: bold; color: #555;">{{ log.target_category }}</td>
+                        <td style="color: #444;">{{ log.details }}</td>
+                        <td style="color: #888; font-size: 0.9em;">{{ log.ip_address }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 50px; color: #999;">
+                            조건에 맞는 로그 데이터가 없습니다.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
